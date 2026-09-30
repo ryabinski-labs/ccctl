@@ -9,10 +9,10 @@
 
 | Level | Scenarios | red | green | blocked | obsolete |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| unit | 23 | 0 | 23 | 0 | 0 |
+| unit | 24 | 0 | 24 | 0 | 0 |
 | integration | 31 | 0 | 31 | 0 | 0 |
 | acceptance | 9 | 5 | 4 | 0 | 0 |
-| **total** | **63** | 5 | 58 | 0 | 0 |
+| **total** | **64** | 5 | 59 | 0 | 0 |
 
 ## Non-goals
 
@@ -346,6 +346,15 @@
 - **Oracle:** second Run returns 'ccctl is already running for this user. Stop it first (ccctl uninstall, or stop the other ccctl serve).' AND the first socket file still exists
 - **Test doubles:** fake Tailscale status and WhoIs
 - **Test:** `internal/tdd/auth_test.go::SC-006-g`
+
+#### SC-006-h — Tailscale CLI runs in CLI mode under a service manager  `unit` `green`
+
+- **Given** launchd's minimal environment (HOME and PATH only), where the macOS app-bundle binary starts its GUI instead of the CLI
+- **When** the controller builds the environment for a Tailscale CLI call
+- **Then** the environment forces CLI mode and keeps the inherited variables
+- **Oracle:** env contains 'TAILSCALE_BE_CLI=1' AND the inherited HOME
+- **Test doubles:** none; pure function
+- **Test:** `internal/tdd/unit_test.go::SC-006-h`
 
 ### REQ-007 — At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited and resume-failed panes count as free and are replaced without touching their worktrees.
 

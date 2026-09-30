@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/ryabinski-labs/claude-code-controller/internal/app"
@@ -79,6 +81,7 @@ func run(args []string) int {
 			fmt.Fprintln(os.Stderr, "install failed:", err)
 			return 1
 		}
+		firewallHint(home)
 		return run([]string{"status"})
 	case "uninstall":
 		if err := install.Uninstall(context.Background(), install.Options{Out: os.Stdout}); err != nil {
@@ -95,6 +98,23 @@ func run(args []string) int {
 	}
 	fmt.Fprint(os.Stderr, usage)
 	return 2
+}
+
+// firewallHint explains the one-time firewall step on macOS: with the
+// Application Firewall on, connections to a new unsigned binary are held
+// silently until it is allowed (found on mac-mini).
+func firewallHint(home string) {
+	const fw = "/usr/libexec/ApplicationFirewall/socketfilterfw"
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	out, err := exec.Command(fw, "--getglobalstate").Output()
+	if err != nil || !strings.Contains(string(out), "enabled") {
+		return
+	}
+	bin := filepath.Join(config.Dir(home), "bin", "ccctl")
+	fmt.Printf("\nThe macOS firewall is on. Allow ccctl to accept connections (once per install or upgrade):\n"+
+		"  sudo %[1]s --add %[2]s && sudo %[1]s --unblockapp %[2]s\n\n", fw, bin)
 }
 
 func serve(home string) int {

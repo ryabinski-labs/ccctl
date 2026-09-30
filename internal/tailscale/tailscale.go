@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -86,8 +87,14 @@ func ParseStatus(b []byte) (Status, error) {
 func (c CLI) run(ctx context.Context, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return exec.CommandContext(ctx, c.Path, args...).Output()
+	cmd := exec.CommandContext(ctx, c.Path, args...)
+	cmd.Env = CLIEnv(os.Environ())
+	return cmd.Output()
 }
+
+// CLIEnv forces CLI mode: the macOS app-bundle binary otherwise tries to start
+// the GUI when run from launchd's minimal environment (found on mac-mini).
+func CLIEnv(base []string) []string { return append(base, "TAILSCALE_BE_CLI=1") }
 
 func (c CLI) Status(ctx context.Context) (Status, error) {
 	out, err := c.run(ctx, "status", "--json")

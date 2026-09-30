@@ -47,6 +47,17 @@ To roll back, run `ccctl install --version <previous tag>`. `ccctl uninstall` re
 
 **macOS privacy prompt:** the first time the launchd agent scans `~/Documents` for repos, macOS asks whether `ccctl` may access Documents. The dialog shows on the host's own screen (use Screen Sharing on a headless Mac). Click Allow, or scanning `~/Documents` finds nothing.
 
+### macOS firewall
+
+If the macOS Application Firewall is on, it silently holds connections to a newly
+installed or upgraded `ccctl` binary (the page never loads; `ccctl status` still says it is serving).
+`ccctl install` prints the command; run it once per install or upgrade on the host:
+
+```sh
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add ~/.ccctl/bin/ccctl
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp ~/.ccctl/bin/ccctl
+```
+
 ## Commands
 
 | Command | Purpose |

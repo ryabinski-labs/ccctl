@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -230,7 +231,15 @@ func (a *App) check(ctx context.Context) {
 	a.message = msg
 	a.mu.Unlock()
 	if msg != "" && msg != prevMsg {
-		a.opt.Log.Warn("tailscale_not_running", "backend_state", st.BackendState, "message", msg)
+		errText := ""
+		if err != nil {
+			errText = err.Error()
+			var ee *exec.ExitError
+			if errors.As(err, &ee) {
+				errText += ": " + strings.TrimSpace(string(ee.Stderr))
+			}
+		}
+		a.opt.Log.Warn("tailscale_not_running", "backend_state", st.BackendState, "message", msg, "error", errText)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -264,5 +265,13 @@ func TestSc011ARingBufferKeepsTheNewest1Mib(t *testing.T) {
 	snap := r.Snapshot()
 	if len(snap) != 1048576 || string(snap) != string(in[10:]) {
 		t.Fatalf("len=%d match=%v", len(snap), string(snap) == string(in[10:]))
+	}
+}
+
+// SC-006-h
+func TestSc006HTailscaleCliRunsInCliModeUnderAServiceManager(t *testing.T) {
+	env := tailscale.CLIEnv([]string{"HOME=/h", "PATH=/usr/bin:/bin"})
+	if !slices.Contains(env, "TAILSCALE_BE_CLI=1") || !slices.Contains(env, "HOME=/h") {
+		t.Fatalf("env = %v", env)
 	}
 }

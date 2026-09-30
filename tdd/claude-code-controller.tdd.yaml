@@ -492,6 +492,19 @@ requirements:
     - found-in-smoke-test
     test_ref: internal/tdd/auth_test.go::SC-006-g
     status: green
+  - id: SC-006-h
+    level: unit
+    title: Tailscale CLI runs in CLI mode under a service manager
+    given: launchd's minimal environment (HOME and PATH only), where the macOS app-bundle binary starts its GUI instead of the CLI
+    when: the controller builds the environment for a Tailscale CLI call
+    then: the environment forces CLI mode and keeps the inherited variables
+    oracle: env contains 'TAILSCALE_BE_CLI=1' AND the inherited HOME
+    doubles: none; pure function
+    tags:
+    - go
+    - found-on-mac-mini
+    test_ref: internal/tdd/unit_test.go::SC-006-h
+    status: green
 - id: REQ-007
   text: At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited
     and resume-failed panes count as free and are replaced without touching their worktrees.
