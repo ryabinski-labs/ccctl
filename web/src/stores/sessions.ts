@@ -31,6 +31,9 @@ export const useSessions = defineStore('sessions', {
     connected: false,
     /** true after a connection attempt failed or dropped; drives the reconnect banner. */
     lost: false,
+    /** Version from the first hello this page saw; a different one later means ccctl was upgraded. */
+    serverVersion: '' as string,
+    updated: false,
     everConnected: false,
     retryIn: 0,
     muted: readPref('ccctl.muted'),
@@ -73,6 +76,10 @@ export const useSessions = defineStore('sessions', {
     },
 
     applyHello(h: Hello) {
+      if (h.version) {
+        if (this.serverVersion && h.version !== this.serverVersion) this.updated = true;
+        else if (!this.serverVersion) this.serverVersion = h.version;
+      }
       this.host = h.host || this.host;
       this.login = h.login;
       for (let i = 0; i < MAX_SESSIONS; i++) {

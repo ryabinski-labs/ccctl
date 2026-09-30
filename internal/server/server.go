@@ -38,6 +38,8 @@ type Server struct {
 	Host   func() string
 	Static fs.FS // may be nil
 	Log    *slog.Logger
+	// Version is the ccctl build, sent in hello so stale pages can offer a reload.
+	Version string
 
 	mu      sync.Mutex
 	clients map[*client]struct{}
@@ -87,12 +89,13 @@ type hello struct {
 	Type        string          `json:"type,omitempty"`
 	Host        string          `json:"host"`
 	Login       string          `json:"login"`
+	Version     string          `json:"version,omitempty"`
 	MaxSessions int             `json:"max_sessions"`
 	Slots       []*session.Info `json:"slots"`
 }
 
 func (s *Server) hello(r *http.Request) hello {
-	return hello{Host: s.Host(), Login: auth.LoginFrom(r.Context()), MaxSessions: config.MaxSessions, Slots: s.M.Slots()}
+	return hello{Version: s.Version, Host: s.Host(), Login: auth.LoginFrom(r.Context()), MaxSessions: config.MaxSessions, Slots: s.M.Slots()}
 }
 
 func (s *Server) state(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.hello(r)) }

@@ -9,10 +9,10 @@
 
 | Level | Scenarios | red | green | blocked | obsolete |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| unit | 25 | 0 | 25 | 0 | 0 |
+| unit | 26 | 0 | 26 | 0 | 0 |
 | integration | 32 | 0 | 32 | 0 | 0 |
 | acceptance | 9 | 5 | 4 | 0 | 0 |
-| **total** | **66** | 5 | 61 | 0 | 0 |
+| **total** | **67** | 5 | 62 | 0 | 0 |
 
 ## Non-goals
 
@@ -373,6 +373,15 @@
 - **Oracle:** env contains 'TAILSCALE_BE_CLI=1' AND the inherited HOME
 - **Test doubles:** none; pure function
 - **Test:** `internal/tdd/unit_test.go::SC-006-h`
+
+#### SC-006-i — Page offers a reload when ccctl was upgraded  `unit` `green`
+
+- **Given** a page that received hello with version v0.1.1
+- **When** it reconnects and gets v0.1.1 again, then v0.1.2
+- **Then** only the changed version shows the update banner with a Reload button
+- **Oracle:** store.updated == false after the same version AND == true after v0.1.2 AND banner text contains 'ccctl on mac-mini was updated. Reload to use the new version'
+- **Test doubles:** none; store and component
+- **Test:** `web/src/tdd/claude_code_controller.tdd.spec.ts::SC-006-i`
 
 ### REQ-007 — At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited and resume-failed panes count as free and are replaced without touching their worktrees.
 

@@ -6,6 +6,8 @@ export interface Hello {
   type: 'hello';
   host: string;
   login: string;
+  /** ccctl build version; a change after reconnect means the page is stale. */
+  version?: string;
   slots: (SlotInfo | null)[];
 }
 

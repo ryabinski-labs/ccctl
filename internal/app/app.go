@@ -42,6 +42,8 @@ type Options struct {
 	ResumeGrace time.Duration
 	// SockPath overrides ~/.ccctl/ccctl.sock (tests use short paths).
 	SockPath string
+	// Version is the ccctl build version shown to pages.
+	Version string
 }
 
 type App struct {
@@ -79,7 +81,7 @@ func New(o Options) (*App, error) {
 	}
 	a := &App{opt: o, Store: state.NewStore(dir), mon: tailscale.NewMonitor()}
 	a.mon.Interval = o.Interval
-	a.S = &server.Server{Home: o.Home, Roots: func() []string { return o.Config.Roots }, Host: a.hostName, Static: o.Static, Log: o.Log}
+	a.S = &server.Server{Home: o.Home, Roots: func() []string { return o.Config.Roots }, Host: a.hostName, Static: o.Static, Log: o.Log, Version: o.Version}
 	a.M = session.NewManager(session.Options{
 		Home: o.Home, ClaudePath: o.Config.ClaudePath, CCCTLPath: o.CCCTLPath, SettingsDir: filepath.Join(dir, "sessions"),
 		SockPath: o.SockPath, Env: o.Env, Store: a.Store, Log: o.Log, StopGrace: o.StopGrace, ResumeGrace: o.ResumeGrace,

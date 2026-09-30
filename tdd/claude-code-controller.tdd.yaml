@@ -531,6 +531,19 @@ requirements:
     - found-on-mac-mini
     test_ref: internal/tdd/unit_test.go::SC-006-h
     status: green
+  - id: SC-006-i
+    level: unit
+    title: Page offers a reload when ccctl was upgraded
+    given: a page that received hello with version v0.1.1
+    when: it reconnects and gets v0.1.1 again, then v0.1.2
+    then: only the changed version shows the update banner with a Reload button
+    oracle: store.updated == false after the same version AND == true after v0.1.2 AND banner text contains 'ccctl on mac-mini was updated. Reload to use the new version'
+    doubles: none; store and component
+    tags:
+    - vitest
+    - found-on-mac-mini
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-006-i
+    status: green
 - id: REQ-007
   text: At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited
     and resume-failed panes count as free and are replaced without touching their worktrees.

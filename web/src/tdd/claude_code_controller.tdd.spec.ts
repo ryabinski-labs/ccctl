@@ -238,3 +238,19 @@ describe('REQ-010 — Stopping a session sends SIGHUP to its process group, then
     w.unmount();
   });
 });
+
+describe('REQ-006 — stale page after an upgrade', () => {
+  it('SC-006-i Page offers a reload when ccctl was upgraded', async () => {
+    setActivePinia(createPinia());
+    const store = useSessions();
+    const hello = (version: string) => ({ type: 'hello' as const, host: 'mac-mini', login: 'o', version, slots: [null, null, null, null] });
+    store.applyHello(hello('v0.1.1'));
+    store.applyHello(hello('v0.1.1')); // plain reconnect, same build
+    expect(store.updated).toBe(false);
+    store.applyHello(hello('v0.1.2'));
+    expect(store.updated).toBe(true);
+    const w = mount(ReconnectBanner);
+    await flushPromises();
+    expect(w.get('[data-testid="updated-banner"]').text()).toContain('ccctl on mac-mini was updated. Reload to use the new version');
+  });
+});

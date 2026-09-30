@@ -8,6 +8,19 @@ const store = useSessions();
 const keysOpen = ref(false);
 const keysWrap = ref<HTMLElement | null>(null);
 const keysBtn = ref<HTMLButtonElement | null>(null);
+const keysPop = ref<HTMLElement | null>(null);
+// The popover is teleported to <body> with fixed positioning so no stacking
+// context (header backdrop-filter, panes, xterm layers) can paint over it in any engine.
+const popPos = ref<Record<string, string>>({});
+function place() {
+  const r = keysBtn.value?.getBoundingClientRect();
+  if (r) popPos.value = { top: `${r.bottom + 6}px`, right: `${Math.max(8, window.innerWidth - r.right)}px` };
+}
+function toggleKeys() {
+  keysOpen.value = !keysOpen.value;
+  if (keysOpen.value) place();
+}
+const inKeys = (n: Node | null) => !!n && (!!keysWrap.value?.contains(n) || !!keysPop.value?.contains(n));
 
 // Disclosure popover: close on Escape (focus back to the button), on a click
 // outside, and when focus leaves it, so it never sits over the panes.
@@ -18,18 +31,20 @@ function onDocKey(e: KeyboardEvent) {
   }
 }
 function onDocPointer(e: PointerEvent) {
-  if (keysOpen.value && !keysWrap.value?.contains(e.target as Node)) keysOpen.value = false;
+  if (keysOpen.value && !inKeys(e.target as Node)) keysOpen.value = false;
 }
 function onFocusOut(e: FocusEvent) {
-  if (!keysWrap.value?.contains(e.relatedTarget as Node | null)) keysOpen.value = false;
+  if (!inKeys(e.relatedTarget as Node | null)) keysOpen.value = false;
 }
 onMounted(() => {
   document.addEventListener('keydown', onDocKey, true);
   document.addEventListener('pointerdown', onDocPointer, true);
+  window.addEventListener('resize', place);
 });
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onDocKey, true);
   document.removeEventListener('pointerdown', onDocPointer, true);
+  window.removeEventListener('resize', place);
 });
 
 const summary = computed(() => {
@@ -73,11 +88,21 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
           ref="keysBtn"
           :aria-expanded="keysOpen"
           aria-controls="keys-pop"
-          @click="keysOpen = !keysOpen"
+          @click="toggleKeys"
         >
           <AppIcon name="keyboard" :size="16" />Keys
         </button>
-        <div v-if="keysOpen" id="keys-pop" class="keys-pop" role="region" aria-label="Keyboard shortcuts" @keydown.esc="keysOpen = false">
+        <Teleport to="body">
+        <div
+          v-if="keysOpen"
+          id="keys-pop"
+          ref="keysPop"
+          class="keys-pop"
+          role="region"
+          aria-label="Keyboard shortcuts"
+          :style="popPos"
+          @focusout="onFocusOut"
+        >
           <dl>
             <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>1</kbd>–<kbd>4</kbd></dt>
             <dd>Type into pane 1–4</dd>
@@ -87,6 +112,7 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
             <dd>Maximize or restore the focused pane</dd>
           </dl>
         </div>
+        </Teleport>
       </div>
 
       <button
@@ -232,10 +258,8 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
   position: relative;
 }
 .keys-pop {
-  position: absolute;
-  right: 0;
-  top: 38px;
-  z-index: 40;
+  position: fixed;
+  z-index: 45; /* above panes and header; below modals (50) */
   width: 320px;
   padding: 12px 14px;
   border: 1px solid var(--rule);

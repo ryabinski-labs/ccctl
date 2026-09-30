@@ -153,7 +153,7 @@ func serve(home string) int {
 	}
 	self, _ := os.Executable()
 	a, err := app.New(app.Options{
-		Home: home, Config: cfg, CCCTLPath: self, Env: os.Environ(), Log: log, Static: web.Dist(),
+		Home: home, Config: cfg, CCCTLPath: self, Version: version, Env: os.Environ(), Log: log, Static: web.Dist(),
 		TS: tailscale.AutoCLI{Configured: cfg.TailscalePath, LookPath: exec.LookPath, Exists: exists},
 	})
 	if err != nil {
