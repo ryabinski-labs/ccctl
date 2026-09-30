@@ -4,6 +4,8 @@ package tdd
 import (
 	"bytes"
 	"context"
+	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/ryabinski-labs/claude-code-controller/internal/app"
 	"github.com/ryabinski-labs/claude-code-controller/internal/server"
 	"github.com/ryabinski-labs/claude-code-controller/internal/session"
 	"github.com/ryabinski-labs/claude-code-controller/internal/statuscmd"
@@ -175,4 +178,21 @@ func TestSc006DTailscaleDropKeepsSessionsAlive(t *testing.T) {
 		t.Fatalf("dial after recovery: %v", err)
 	}
 	c.Close()
+}
+
+// SC-006-g
+func TestSc006GSecondControllerRefusesToStart(t *testing.T) {
+	h := tu.Start(t, tu.Opts{})
+	b, err := app.New(app.Options{Home: h.Home, Config: h.App.Config(), TS: tu.NewFakeTS(), SockPath: h.Sock, Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := b.Run(ctx); err == nil || err.Error() != app.AlreadyRunningMessage {
+		t.Fatalf("second Run = %v", err)
+	}
+	if _, err := os.Stat(h.Sock); err != nil {
+		t.Fatalf("first controller's socket was removed: %v", err)
+	}
 }

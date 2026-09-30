@@ -10,9 +10,9 @@
 | Level | Scenarios | red | green | blocked | obsolete |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | unit | 23 | 0 | 23 | 0 | 0 |
-| integration | 29 | 0 | 29 | 0 | 0 |
+| integration | 31 | 0 | 31 | 0 | 0 |
 | acceptance | 9 | 5 | 4 | 0 | 0 |
-| **total** | **61** | 5 | 56 | 0 | 0 |
+| **total** | **63** | 5 | 58 | 0 | 0 |
 
 ## Non-goals
 
@@ -338,6 +338,15 @@
 - **Test doubles:** fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
 - **Test:** `web/e2e/claude_code_controller.tdd.spec.ts::SC-006-f`
 
+#### SC-006-g — A second controller refuses to start  `integration` `green`
+
+- **Given** a controller running for this user
+- **When** a second ccctl serve starts with the same home
+- **Then** it refuses with the named message and leaves the first controller's hook socket in place
+- **Oracle:** second Run returns 'ccctl is already running for this user. Stop it first (ccctl uninstall, or stop the other ccctl serve).' AND the first socket file still exists
+- **Test doubles:** fake Tailscale status and WhoIs
+- **Test:** `internal/tdd/auth_test.go::SC-006-g`
+
 ### REQ-007 — At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited and resume-failed panes count as free and are replaced without touching their worktrees.
 
 **Priority:** P0 · **Type:** functional · **PRD:** §5 story 5; DL-010; DL-016
@@ -426,6 +435,15 @@
 - **Oracle:** pane 1 header shows text 'Needs input' within 2000 ms
 - **Test doubles:** fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
 - **Test:** `web/e2e/claude_code_controller.tdd.spec.ts::SC-008-e`
+
+#### SC-008-f — Automatic terminal replies do not clear needs-input  `integration` `green`
+
+- **Given** slot 2 in needs-input
+- **When** the browser terminal sends focus-in (ESC [ I) and a cursor position report (ESC [ 12;40 R), then the owner types y
+- **Then** the replies leave needs-input set and only the keystroke clears it
+- **Oracle:** slot 2 state == needs-input after the replies AND == running after 'y'
+- **Test doubles:** fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+- **Test:** `internal/tdd/lifecycle_test.go::SC-008-f`
 
 ### REQ-009 — On startup the controller relaunches every session that was starting, running, or needs-input with claude --resume in its original slot and folder before accepting connections; a resume that exits non-zero within 5 seconds shows resume-failed with Start fresh and Close.
 

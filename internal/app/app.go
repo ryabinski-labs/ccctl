@@ -13,7 +13,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ryabinski-labs/claude-code-controller/internal/auth"
@@ -90,6 +92,9 @@ func New(o Options) (*App, error) {
 func (a *App) hostName() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if short, _, _ := strings.Cut(a.st.DNSName, "."); short != "" {
+		return short // MagicDNS name, e.g. mac-mini
+	}
 	if a.st.HostName != "" {
 		return a.st.HostName
 	}
@@ -125,7 +130,8 @@ func (a *App) hosts() []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	var hs []string
-	for _, h := range []string{a.st.IPv4, a.st.HostName, a.st.DNSName} {
+	short, _, _ := strings.Cut(a.st.DNSName, ".")
+	for _, h := range []string{a.st.IPv4, a.st.HostName, a.st.DNSName, short} {
 		if h != "" {
 			hs = append(hs, h)
 		}
@@ -135,6 +141,9 @@ func (a *App) hosts() []string {
 	}
 	return hs
 }
+
+// Config returns the controller's configuration.
+func (a *App) Config() config.Config { return a.opt.Config }
 
 // Addr is the bound listener address, or "" when not serving.
 func (a *App) Addr() string {
@@ -154,6 +163,11 @@ func (a *App) Message() string { a.mu.Lock(); defer a.mu.Unlock(); return a.mess
 
 // Run resumes saved sessions, then serves until ctx ends (REQ-006, REQ-009).
 func (a *App) Run(ctx context.Context) error {
+	lock, err := a.lock()
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
 	if err := a.M.Resume(); err != nil {
 		return err
 	}
@@ -161,7 +175,7 @@ func (a *App) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer func() { sock.Close(); os.Remove(a.opt.SockPath) }()
+	defer func() { sock.Close(); os.Remove(a.opt.SockPath) }() // lock still held here
 	a.check(ctx)
 	t := time.NewTicker(a.opt.Interval)
 	defer t.Stop()
@@ -246,6 +260,23 @@ func (a *App) unbind() {
 		srv.Close()
 		a.S.CloseClients()
 	}
+}
+
+// AlreadyRunningMessage is returned when another controller holds the lock.
+const AlreadyRunningMessage = "ccctl is already running for this user. Stop it first (ccctl uninstall, or stop the other ccctl serve)."
+
+// lock takes an exclusive lock on the socket path so two controllers never share
+// one hook socket and state file.
+func (a *App) lock() (*os.File, error) {
+	f, err := os.OpenFile(a.opt.SockPath+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		f.Close()
+		return nil, errors.New(AlreadyRunningMessage)
+	}
+	return f, nil
 }
 
 // StatusReply is GET /status on the Unix socket.

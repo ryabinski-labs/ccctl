@@ -479,6 +479,19 @@ requirements:
     - playwright
     test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-006-f
     status: green
+  - id: SC-006-g
+    level: integration
+    title: A second controller refuses to start
+    given: a controller running for this user
+    when: a second ccctl serve starts with the same home
+    then: it refuses with the named message and leaves the first controller's hook socket in place
+    oracle: second Run returns 'ccctl is already running for this user. Stop it first (ccctl uninstall, or stop the other ccctl serve).' AND the first socket file still exists
+    doubles: fake Tailscale status and WhoIs
+    tags:
+    - go
+    - found-in-smoke-test
+    test_ref: internal/tdd/auth_test.go::SC-006-g
+    status: green
 - id: REQ-007
   text: At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited
     and resume-failed panes count as free and are replaced without touching their worktrees.
@@ -606,6 +619,19 @@ requirements:
     tags:
     - playwright
     test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-008-e
+    status: green
+  - id: SC-008-f
+    level: integration
+    title: Automatic terminal replies do not clear needs-input
+    given: slot 2 in needs-input
+    when: the browser terminal sends focus-in (ESC [ I) and a cursor position report (ESC [ 12;40 R), then the owner types y
+    then: the replies leave needs-input set and only the keystroke clears it
+    oracle: slot 2 state == needs-input after the replies AND == running after 'y'
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    - found-in-smoke-test
+    test_ref: internal/tdd/lifecycle_test.go::SC-008-f
     status: green
 - id: REQ-009
   text: On startup the controller relaunches every session that was starting, running, or needs-input with claude --resume

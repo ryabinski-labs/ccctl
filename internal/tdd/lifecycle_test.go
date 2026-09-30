@@ -58,6 +58,24 @@ func TestSc008CKeystrokeClearsNeedsInput(t *testing.T) {
 	h.WaitState(2, session.Running, 2*time.Second)
 }
 
+// SC-008-f
+func TestSc008FAutomaticTerminalRepliesDoNotClearNeedsInput(t *testing.T) {
+	h := tu.Start(t, tu.Opts{})
+	launchN(h, 2)
+	h.WaitState(2, session.Running, 5*time.Second)
+	h.App.M.Hook(2, "Stop", "")
+	h.WaitState(2, session.NeedsInput, time.Second)
+	ws := h.Dial()
+	ws.Input(2, "\x1b[I")
+	ws.Input(2, "\x1b[12;40R")
+	tu.Eventually(t, 2*time.Second, func() bool { return len(h.InputLog(2)) >= 10 }, "replies not delivered")
+	if st := h.Slot(2).State; st != session.NeedsInput {
+		t.Fatalf("state after replies = %s", st)
+	}
+	ws.Input(2, "y")
+	h.WaitState(2, session.Running, 2*time.Second)
+}
+
 func writeState(t *testing.T, home string, slots []state.Slot) {
 	if err := state.NewStore(config.Dir(home)).Save(slots); err != nil {
 		t.Fatal(err)

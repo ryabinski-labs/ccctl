@@ -263,10 +263,20 @@ func (m *Manager) startLocked(info Info, prompt string, resume bool) (Info, erro
 	return inf, nil
 }
 
+// inheritedMarkers are per-session variables a parent Claude Code session sets;
+// passing them on makes the child think it is a subagent (no transcript, so no
+// --resume). User configuration variables such as CLAUDE_CODE_USE_BEDROCK pass through.
+var inheritedMarkers = map[string]bool{
+	"CLAUDECODE": true, "CLAUDE_CODE_ENTRYPOINT": true, "CLAUDE_CODE_CHILD_SESSION": true,
+	"CLAUDE_CODE_SESSION_ID": true, "CLAUDE_CODE_SESSION_ATTENDED": true, "CLAUDE_CODE_MESSAGING_SOCKET": true,
+	"CLAUDE_CODE_MESSAGING_TOKEN": true, "CLAUDE_CODE_EXECPATH": true, "CLAUDE_PID": true,
+	"CLAUDE_CODE_STOP_HOOK_BLOCK_CAP": true, "CLAUDE_CODE_SSE_PORT": true,
+}
+
 func (m *Manager) env(slot int) []string {
 	var env []string
 	for _, e := range m.opt.Env {
-		if strings.HasPrefix(e, "CLAUDECODE=") || strings.HasPrefix(e, "CLAUDE_CODE_ENTRYPOINT=") || strings.HasPrefix(e, "TERM=") {
+		if k, _, _ := strings.Cut(e, "="); inheritedMarkers[k] || k == "TERM" || strings.HasPrefix(k, "CCCTL_") {
 			continue
 		}
 		env = append(env, e)
@@ -460,7 +470,7 @@ func (m *Manager) Input(slot int, client string, data []byte) error {
 	if sz, ok := s.sizes[client]; ok {
 		s.applySizeLocked(sz)
 	}
-	cleared := s.info.State == NeedsInput
+	cleared := s.info.State == NeedsInput && !IsTerminalReply(data)
 	if cleared {
 		s.info.State = Running
 	}
