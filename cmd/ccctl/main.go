@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/ryabinski-labs/claude-code-controller/internal/app"
 	"github.com/ryabinski-labs/claude-code-controller/internal/config"
@@ -82,6 +84,14 @@ func run(args []string) int {
 			return 1
 		}
 		firewallHint(home)
+		// The service needs a moment to start; poll status for up to 10 s.
+		var code int
+		for i := 0; i < 20; i++ {
+			if code = statusQuiet(home); code == statuscmd.ExitOK {
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
 		return run([]string{"status"})
 	case "uninstall":
 		if err := install.Uninstall(context.Background(), install.Options{Out: os.Stdout}); err != nil {
@@ -115,6 +125,15 @@ func firewallHint(home string) {
 	bin := filepath.Join(config.Dir(home), "bin", "ccctl")
 	fmt.Printf("\nThe macOS firewall is on. Allow ccctl to accept connections (once per install or upgrade):\n"+
 		"  sudo %[1]s --add %[2]s && sudo %[1]s --unblockapp %[2]s\n\n", fw, bin)
+}
+
+func statusQuiet(home string) int {
+	cfg, err := config.Load(home)
+	if err != nil {
+		return 1
+	}
+	ts := tailscale.AutoCLI{Configured: cfg.TailscalePath, LookPath: exec.LookPath, Exists: exists}
+	return statuscmd.Run(context.Background(), ts, cfg.Port, filepath.Join(config.Dir(home), "ccctl.sock"), io.Discard)
 }
 
 func serve(home string) int {
