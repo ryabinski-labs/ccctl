@@ -123,6 +123,9 @@ func firewallHint(home string) {
 		return
 	}
 	bin := filepath.Join(config.Dir(home), "bin", "ccctl")
+	if out, err := exec.Command(fw, "--getappblocked", bin).Output(); err == nil && strings.Contains(string(out), "permitted") {
+		return // already allowed
+	}
 	fmt.Printf("\nThe macOS firewall is on. Allow ccctl to accept connections (once per install or upgrade):\n"+
 		"  sudo %[1]s --add %[2]s && sudo %[1]s --unblockapp %[2]s\n\n", fw, bin)
 }
