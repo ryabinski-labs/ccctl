@@ -275,3 +275,15 @@ func TestSc006HTailscaleCliRunsInCliModeUnderAServiceManager(t *testing.T) {
 		t.Fatalf("env = %v", env)
 	}
 }
+
+// SC-003-b
+func TestSc003BRepoScanSkipsLinkedWorktrees(t *testing.T) {
+	home := t.TempDir()
+	os.MkdirAll(filepath.Join(home, "Documents/folio/.git"), 0o755)
+	os.MkdirAll(filepath.Join(home, "Documents/folio-wt-fix-login"), 0o755)
+	os.WriteFile(filepath.Join(home, "Documents/folio-wt-fix-login/.git"), []byte("gitdir: ../folio/.git/worktrees/fix-login\n"), 0o644)
+	got := repos.Scan(home, []string{filepath.Join(home, "Documents")})
+	if len(got) != 1 || got[0].Name != "folio" {
+		t.Fatalf("scan = %+v", got)
+	}
+}

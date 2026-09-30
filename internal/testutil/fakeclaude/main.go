@@ -52,7 +52,7 @@ func main() {
 	cwd, _ := os.Getwd()
 	if logDir != "" {
 		os.MkdirAll(logDir, 0o755)
-		b, _ := json.Marshal(map[string]any{"slot": slot, "argv": os.Args, "cwd": cwd, "pid": os.Getpid(), "time": time.Now().UnixNano()})
+		b, _ := json.Marshal(map[string]any{"slot": slot, "argv": os.Args, "cwd": cwd, "env": os.Environ(), "pid": os.Getpid(), "time": time.Now().UnixNano()})
 		f, _ := os.OpenFile(filepath.Join(logDir, "invocations.jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		f.Write(append(b, '\n'))
 		f.Close()

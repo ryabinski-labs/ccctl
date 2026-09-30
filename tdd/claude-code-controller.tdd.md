@@ -9,10 +9,10 @@
 
 | Level | Scenarios | red | green | blocked | obsolete |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| unit | 24 | 0 | 24 | 0 | 0 |
-| integration | 31 | 0 | 31 | 0 | 0 |
+| unit | 25 | 0 | 25 | 0 | 0 |
+| integration | 32 | 0 | 32 | 0 | 0 |
 | acceptance | 9 | 5 | 4 | 0 | 0 |
-| **total** | **64** | 5 | 59 | 0 | 0 |
+| **total** | **66** | 5 | 61 | 0 | 0 |
 
 ## Non-goals
 
@@ -67,6 +67,15 @@
 - **Oracle:** argv == [claude_path, '--dangerously-skip-permissions', '--session-id', U, '--settings', F, 'hello'] with prompt; identical minus the last element without prompt
 - **Test doubles:** none; pure function
 - **Test:** `internal/tdd/unit_test.go::SC-001-c`
+
+#### SC-001-d — Config [env] reaches every session and reloads without a restart  `integration` `green`
+
+- **Given** ~/.ccctl/config.toml with [env] GEMINI_API_KEY = key-one and CCCTL_SOCK = /evil
+- **When** a session launches, the file is edited to key-two, and a second session launches
+- **Then** each session gets the value current at its launch, ccctl's own variables cannot be overridden, and no value is logged
+- **Oracle:** session 1 env has GEMINI_API_KEY=key-one and not CCCTL_SOCK=/evil AND session 2 env has GEMINI_API_KEY=key-two AND the log contains neither value
+- **Test doubles:** fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+- **Test:** `internal/tdd/launch_test.go::SC-001-d`
 
 ### REQ-002 — Invalid launch input is refused with the spec's message and no session, folder, or branch is created.
 
@@ -146,6 +155,15 @@
 - **Oracle:** result set == {Documents/a, Documents/x/y/b, HOME/d} AND scanner returned no error
 - **Test doubles:** real filesystem temp HOME
 - **Test:** `internal/tdd/unit_test.go::SC-003-a`
+
+#### SC-003-b — Repo scan skips linked worktrees  `unit` `green`
+
+- **Given** Documents/folio (a repo) and Documents/folio-wt-fix-login (a linked worktree with a .git file)
+- **When** the repo scanner runs
+- **Then** only the repo is listed
+- **Oracle:** result == [folio]
+- **Test doubles:** real filesystem temp HOME
+- **Test:** `internal/tdd/unit_test.go::SC-003-b`
 
 ### REQ-004 — The owner sees every session's live output in its own pane and keystrokes typed in a pane reach only that session's PTY; a maximized pane resizes its PTY.
 

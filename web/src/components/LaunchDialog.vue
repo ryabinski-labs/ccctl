@@ -541,6 +541,10 @@ legend {
   padding: 12px 20px 16px;
   border-top: 1px solid var(--rule);
   background: var(--paper);
+  /* Keep Start session in view on short windows (1280x720) while the form scrolls. */
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
 }
 .spinner {
   width: 13px;

@@ -47,6 +47,20 @@ To roll back, run `ccctl install --version <previous tag>`. `ccctl uninstall` re
 
 **macOS privacy prompt:** the first time the launchd agent scans `~/Documents` for repos, macOS asks whether `ccctl` may access Documents. The dialog shows on the host's own screen (use Screen Sharing on a headless Mac). Click Allow, or scanning `~/Documents` finds nothing.
 
+### Environment for sessions (API keys)
+
+Sessions run under launchd or systemd, so they do not see your shell profile. Put variables every
+Claude session should get in an `[env]` table in `~/.ccctl/config.toml` (the file is mode 0600):
+
+```toml
+[env]
+GEMINI_API_KEY = "..."
+```
+
+The table is re-read at every launch, so an edit applies to the next session you start, with no
+restart. Sessions that are already running keep the environment they started with; stop and relaunch one
+to pick up a change. Values are never written to the log. `CCCTL_*` and `TERM` cannot be overridden.
+
 ### macOS firewall
 
 If the macOS Application Firewall is on, it silently holds connections to a newly

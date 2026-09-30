@@ -23,6 +23,10 @@ type Config struct {
 	AllowedLogins []string `toml:"allowed_logins"`
 	ClaudePath    string   `toml:"claude_path"`
 	TailscalePath string   `toml:"tailscale_path"`
+	// Env is added to every Claude session's environment (for example
+	// GEMINI_API_KEY). It is re-read at each launch, so edits apply to the next
+	// session without a restart. Values are never logged.
+	Env map[string]string `toml:"env"`
 }
 
 // Dir is the ccctl data folder under home (A-010).

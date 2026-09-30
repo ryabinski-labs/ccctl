@@ -1,11 +1,36 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useSessions } from '../stores/sessions';
 import { TEXT } from '../lib/types';
 import AppIcon from './AppIcon.vue';
 
 const store = useSessions();
 const keysOpen = ref(false);
+const keysWrap = ref<HTMLElement | null>(null);
+const keysBtn = ref<HTMLButtonElement | null>(null);
+
+// Disclosure popover: close on Escape (focus back to the button), on a click
+// outside, and when focus leaves it, so it never sits over the panes.
+function onDocKey(e: KeyboardEvent) {
+  if (e.key === 'Escape' && keysOpen.value) {
+    keysOpen.value = false;
+    keysBtn.value?.focus();
+  }
+}
+function onDocPointer(e: PointerEvent) {
+  if (keysOpen.value && !keysWrap.value?.contains(e.target as Node)) keysOpen.value = false;
+}
+function onFocusOut(e: FocusEvent) {
+  if (!keysWrap.value?.contains(e.relatedTarget as Node | null)) keysOpen.value = false;
+}
+onMounted(() => {
+  document.addEventListener('keydown', onDocKey, true);
+  document.addEventListener('pointerdown', onDocPointer, true);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onDocKey, true);
+  document.removeEventListener('pointerdown', onDocPointer, true);
+});
 
 const summary = computed(() => {
   const parts: string[] = [];
@@ -41,10 +66,11 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
     </p>
 
     <div class="tools" data-header-tools>
-      <div class="keys-wrap">
+      <div ref="keysWrap" class="keys-wrap" @focusout="onFocusOut">
         <button
           type="button"
           class="btn btn--ghost btn--sm"
+          ref="keysBtn"
           :aria-expanded="keysOpen"
           aria-controls="keys-pop"
           @click="keysOpen = !keysOpen"
@@ -110,7 +136,11 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
   padding: 0 12px 0 14px;
   border-bottom: 1px solid var(--rule);
   background: rgba(245, 243, 238, 0.92);
+  /* backdrop-filter makes the header a stacking context, so the Keys popover's
+     z-index only counts inside it; lift the whole header above the pane grid. */
   backdrop-filter: blur(6px);
+  position: relative;
+  z-index: 30;
 }
 .brand {
   display: flex;

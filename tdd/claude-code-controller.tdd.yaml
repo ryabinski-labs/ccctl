@@ -81,6 +81,19 @@ requirements:
     - go
     test_ref: internal/tdd/unit_test.go::SC-001-c
     status: green
+  - id: SC-001-d
+    level: integration
+    title: Config [env] reaches every session and reloads without a restart
+    given: ~/.ccctl/config.toml with [env] GEMINI_API_KEY = key-one and CCCTL_SOCK = /evil
+    when: a session launches, the file is edited to key-two, and a second session launches
+    then: each session gets the value current at its launch, ccctl's own variables cannot be overridden, and no value is logged
+    oracle: session 1 env has GEMINI_API_KEY=key-one and not CCCTL_SOCK=/evil AND session 2 env has GEMINI_API_KEY=key-two AND the log contains neither value
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    - user-request
+    test_ref: internal/tdd/launch_test.go::SC-001-d
+    status: green
 - id: REQ-002
   text: Invalid launch input is refused with the spec's message and no session, folder, or branch is created.
   priority: P0
@@ -200,6 +213,19 @@ requirements:
     tags:
     - go
     test_ref: internal/tdd/unit_test.go::SC-003-a
+    status: green
+  - id: SC-003-b
+    level: unit
+    title: Repo scan skips linked worktrees
+    given: Documents/folio (a repo) and Documents/folio-wt-fix-login (a linked worktree with a .git file)
+    when: the repo scanner runs
+    then: only the repo is listed
+    oracle: result == [folio]
+    doubles: real filesystem temp HOME
+    tags:
+    - go
+    - found-in-visual-qa
+    test_ref: internal/tdd/unit_test.go::SC-003-b
     status: green
 - id: REQ-004
   text: The owner sees every session's live output in its own pane and keystrokes typed in a pane reach only that session's

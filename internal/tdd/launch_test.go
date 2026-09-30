@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -167,5 +168,39 @@ func TestSc007CExitedPaneIsReplacedAndItsWorktreeKept(t *testing.T) {
 	}
 	if !strings.Contains(branches(t, repo), "ctl/old-task") {
 		t.Error("branch ctl/old-task gone")
+	}
+}
+
+// SC-001-d
+func TestSc001DConfigEnvReachesEverySessionAndReloads(t *testing.T) {
+	h := tu.Start(t, tu.Opts{})
+	write := func(v string) {
+		os.WriteFile(filepath.Join(h.Home, ".ccctl", "config.toml"), []byte("[env]\nGEMINI_API_KEY = \""+v+"\"\nCCCTL_SOCK = \"/evil\"\n"), 0o600)
+	}
+	envOf := func(i int) []string {
+		var out []string
+		for _, e := range h.Invocations()[i]["env"].([]any) {
+			out = append(out, e.(string))
+		}
+		return out
+	}
+	write("key-one")
+	d1, d2 := filepath.Join(h.Root, "e1"), filepath.Join(h.Root, "e2")
+	os.MkdirAll(d1, 0o755)
+	os.MkdirAll(d2, 0o755)
+	h.Launch("env-one", d1, false, "")
+	tu.Eventually(t, 5*time.Second, func() bool { return len(h.Invocations()) == 1 }, "not started")
+	e := envOf(0)
+	if !slices.Contains(e, "GEMINI_API_KEY=key-one") || slices.Contains(e, "CCCTL_SOCK=/evil") {
+		t.Fatalf("session 1 env lacks key or allows CCCTL_ override")
+	}
+	write("key-two") // edited while running: applies to the next launch without a restart
+	h.Launch("env-two", d2, false, "")
+	tu.Eventually(t, 5*time.Second, func() bool { return len(h.Invocations()) == 2 }, "not started")
+	if !slices.Contains(envOf(1), "GEMINI_API_KEY=key-two") {
+		t.Fatal("session 2 did not get the reloaded key")
+	}
+	if strings.Contains(h.Log.String(), "key-one") || strings.Contains(h.Log.String(), "key-two") {
+		t.Fatal("a key value reached the log")
 	}
 }

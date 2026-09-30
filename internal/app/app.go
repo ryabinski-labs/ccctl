@@ -84,6 +84,12 @@ func New(o Options) (*App, error) {
 		Home: o.Home, ClaudePath: o.Config.ClaudePath, CCCTLPath: o.CCCTLPath, SettingsDir: filepath.Join(dir, "sessions"),
 		SockPath: o.SockPath, Env: o.Env, Store: a.Store, Log: o.Log, StopGrace: o.StopGrace, ResumeGrace: o.ResumeGrace,
 		OnChange: a.S.SlotChanged,
+		SessionEnv: func() map[string]string {
+			if c, err := config.Load(o.Home); err == nil && c.Env != nil {
+				return c.Env
+			}
+			return o.Config.Env
+		},
 	})
 	a.S.M = a.M
 	a.S.Guard = &auth.Guard{Cache: auth.NewCache(o.TS.WhoIs), Allow: a.allowlist, Hosts: a.hosts, Log: o.Log}

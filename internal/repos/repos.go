@@ -21,9 +21,11 @@ type Repo struct {
 
 var skip = map[string]bool{"node_modules": true, "vendor": true, "Library": true, "target": true, "dist": true, "build": true}
 
+// isRepo is true for a main working tree (.git is a folder). Linked worktrees,
+// including the ones ccctl creates, have a .git file and are not listed.
 func isRepo(dir string) bool {
-	_, err := os.Stat(filepath.Join(dir, ".git"))
-	return err == nil
+	fi, err := os.Stat(filepath.Join(dir, ".git"))
+	return err == nil && fi.IsDir()
 }
 
 // Scan lists repos up to MaxDepth levels under each existing root plus direct
