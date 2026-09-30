@@ -19,6 +19,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -331,8 +332,18 @@ func Run(ctx context.Context, o Options) error {
 		}
 		domain := fmt.Sprintf("gui/%d", o.UID)
 		_, _ = o.Run(ctx, "launchctl", "bootout", domain+"/"+Label)
-		if out, err := o.Run(ctx, "launchctl", "bootstrap", domain, p); err != nil {
-			return fmt.Errorf("launchctl bootstrap: %v: %s", err, out)
+		// bootout returns before the old agent has unloaded, so an immediate
+		// bootstrap fails with error 5 (seen on mac-mini): retry for up to 10 s.
+		var out []byte
+		var bootErr error
+		for i := 0; i < 20; i++ {
+			if out, bootErr = o.Run(ctx, "launchctl", "bootstrap", domain, p); bootErr == nil {
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		if bootErr != nil {
+			return fmt.Errorf("launchctl bootstrap: %v: %s", bootErr, out)
 		}
 		fmt.Fprintf(o.Out, "Loaded launchd agent %s\n", p)
 	case "linux":
