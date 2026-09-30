@@ -55,7 +55,7 @@ requirements:
     tags:
     - playwright
     test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-001-a
-    status: red
+    status: green
   - id: SC-001-b
     level: integration
     title: Worktree is a sibling folder on ctl/TASK from HEAD
@@ -66,8 +66,8 @@ requirements:
     doubles: real git in a temp directory
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-001-b
-    status: red
+    test_ref: internal/tdd/launch_test.go::SC-001-b
+    status: green
   - id: SC-001-c
     level: unit
     title: Fresh-launch argv
@@ -79,8 +79,8 @@ requirements:
     doubles: none; pure function
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-001-c
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-001-c
+    status: green
 - id: REQ-002
   text: Invalid launch input is refused with the spec's message and no session, folder, or branch is created.
   priority: P0
@@ -99,8 +99,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-002-a
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-002-a
+    status: green
   - id: SC-002-b
     level: unit
     title: Custom path rules
@@ -113,8 +113,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-002-b
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-002-b
+    status: green
   - id: SC-002-c
     level: integration
     title: Existing worktree folder or branch blocks launch
@@ -127,8 +127,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-002-c
-    status: red
+    test_ref: internal/tdd/launch_test.go::SC-002-c
+    status: green
   - id: SC-002-d
     level: integration
     title: Non-git folder runs without a worktree
@@ -140,8 +140,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-002-d
-    status: red
+    test_ref: internal/tdd/launch_test.go::SC-002-d
+    status: green
   - id: SC-002-e
     level: integration
     title: Missing claude binary is reported
@@ -153,8 +153,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-002-e
-    status: red
+    test_ref: internal/tdd/launch_test.go::SC-002-e
+    status: green
   - id: SC-002-f
     level: unit
     title: First prompt length boundary
@@ -166,8 +166,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-002-f
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-002-f
+    status: green
   - id: SC-002-g
     level: unit
     title: Launch form disables worktree for non-git folders
@@ -180,7 +180,7 @@ requirements:
     tags:
     - vitest
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-002-g
-    status: red
+    status: green
 - id: REQ-003
   text: The launch form lists git repos found up to 3 folder levels under each existing root (default ~/projects and ~/Documents)
     plus direct children of home, and also accepts a custom path.
@@ -199,8 +199,8 @@ requirements:
     doubles: real filesystem temp HOME
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-003-a
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-003-a
+    status: green
 - id: REQ-004
   text: The owner sees every session's live output in its own pane and keystrokes typed in a pane reach only that session's
     PTY; a maximized pane resizes its PTY.
@@ -219,7 +219,7 @@ requirements:
     tags:
     - playwright
     test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-004-a
-    status: red
+    status: green
   - id: SC-004-b
     level: integration
     title: Input bytes route exactly to one PTY
@@ -231,8 +231,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-004-b
-    status: red
+    test_ref: internal/tdd/io_test.go::SC-004-b
+    status: green
   - id: SC-004-c
     level: integration
     title: Output fan-out keeps per-slot order
@@ -244,8 +244,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-004-c
-    status: red
+    test_ref: internal/tdd/io_test.go::SC-004-c
+    status: green
   - id: SC-004-d
     level: integration
     title: Resize frame sets PTY window size
@@ -256,8 +256,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-004-d
-    status: red
+    test_ref: internal/tdd/io_test.go::SC-004-d
+    status: green
   - id: SC-004-e
     level: unit
     title: Maximize and restore
@@ -269,7 +269,7 @@ requirements:
     tags:
     - vitest
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-004-e
-    status: red
+    status: green
   - id: SC-004-f
     level: acceptance
     title: End-to-end output latency over the tailnet
@@ -298,8 +298,8 @@ requirements:
     doubles: none; pure function
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-005-a
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-005-a
+    status: green
   - id: SC-005-b
     level: integration
     title: Unlisted login gets the 403 page and an audit line
@@ -312,8 +312,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-005-b
-    status: red
+    test_ref: internal/tdd/auth_test.go::SC-005-b
+    status: green
   - id: SC-005-c
     level: integration
     title: Unlisted login cannot open the WebSocket
@@ -325,8 +325,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-005-c
-    status: red
+    test_ref: internal/tdd/auth_test.go::SC-005-c
+    status: green
   - id: SC-005-d
     level: integration
     title: Foreign or missing Origin is refused
@@ -338,8 +338,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-005-d
-    status: red
+    test_ref: internal/tdd/auth_test.go::SC-005-d
+    status: green
   - id: SC-005-e
     level: integration
     title: Listener binds only to the Tailscale IPv4
@@ -350,8 +350,8 @@ requirements:
     doubles: fake Tailscale status
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-005-e
-    status: red
+    test_ref: internal/tdd/auth_test.go::SC-005-e
+    status: green
   - id: SC-005-f
     level: unit
     title: Default allowlist is the host node's login
@@ -362,8 +362,8 @@ requirements:
     doubles: status JSON fixture
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-005-f
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-005-f
+    status: green
   - id: SC-005-g
     level: unit
     title: WhoIs results cached 60 seconds per address
@@ -374,8 +374,8 @@ requirements:
     doubles: fake clock; counting fake WhoIs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-005-g
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-005-g
+    status: green
   - id: SC-005-h
     level: integration
     title: Every route enforces the allowlist
@@ -388,8 +388,8 @@ requirements:
     tags:
     - security
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-005-h
-    status: red
+    test_ref: internal/tdd/auth_test.go::SC-005-h
+    status: green
 - id: REQ-006
   text: 'The controller checks Tailscale every 10 seconds: when Tailscale is not Running it serves nothing and reports the
     spec message, keeps sessions alive, and binds again when Tailscale returns; the page shows a reconnect banner with 1,
@@ -409,8 +409,8 @@ requirements:
     doubles: fake filesystem lookups
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-006-a
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-006-a
+    status: green
   - id: SC-006-b
     level: unit
     title: Monitor interval and transitions
@@ -421,8 +421,8 @@ requirements:
     doubles: none; state machine
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-006-b
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-006-b
+    status: green
   - id: SC-006-c
     level: integration
     title: Startup with Tailscale stopped
@@ -436,8 +436,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-006-c
-    status: red
+    test_ref: internal/tdd/auth_test.go::SC-006-c
+    status: green
   - id: SC-006-d
     level: integration
     title: Tailscale drop keeps sessions alive
@@ -450,8 +450,8 @@ requirements:
       interval
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-006-d
-    status: red
+    test_ref: internal/tdd/auth_test.go::SC-006-d
+    status: green
   - id: SC-006-e
     level: unit
     title: Reconnect backoff and banner text
@@ -464,7 +464,7 @@ requirements:
     tags:
     - vitest
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-006-e
-    status: red
+    status: green
   - id: SC-006-f
     level: acceptance
     title: Banner appears when the controller goes away
@@ -478,7 +478,7 @@ requirements:
     tags:
     - playwright
     test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-006-f
-    status: red
+    status: green
 - id: REQ-007
   text: At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited
     and resume-failed panes count as free and are replaced without touching their worktrees.
@@ -496,8 +496,8 @@ requirements:
     doubles: none; pure function
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-007-a
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-007-a
+    status: green
   - id: SC-007-b
     level: integration
     title: Fifth active launch is refused
@@ -510,8 +510,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-007-b
-    status: red
+    test_ref: internal/tdd/launch_test.go::SC-007-b
+    status: green
   - id: SC-007-c
     level: integration
     title: Exited pane is replaced and its worktree kept
@@ -522,8 +522,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs; real git
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-007-c
-    status: red
+    test_ref: internal/tdd/launch_test.go::SC-007-c
+    status: green
   - id: SC-007-d
     level: unit
     title: New session control state
@@ -536,7 +536,7 @@ requirements:
     tags:
     - vitest
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-007-d
-    status: red
+    status: green
 - id: REQ-008
   text: A pane shows Needs input within 2 seconds of Claude Code's Notification or Stop hook, the tab title counts such panes,
     a single chime plays per transition unless muted, and any keystroke clears it.
@@ -554,8 +554,8 @@ requirements:
     doubles: none; pure function
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-008-a
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-008-a
+    status: green
   - id: SC-008-b
     level: integration
     title: Hook call flips the pane to needs-input
@@ -568,8 +568,8 @@ requirements:
       socket
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-008-b
-    status: red
+    test_ref: internal/tdd/lifecycle_test.go::SC-008-b
+    status: green
   - id: SC-008-c
     level: integration
     title: Keystroke clears needs-input
@@ -580,8 +580,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-008-c
-    status: red
+    test_ref: internal/tdd/lifecycle_test.go::SC-008-c
+    status: green
   - id: SC-008-d
     level: unit
     title: Title count and chime
@@ -594,7 +594,7 @@ requirements:
     tags:
     - vitest
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-008-d
-    status: red
+    status: green
   - id: SC-008-e
     level: acceptance
     title: Needs-input badge appears
@@ -606,7 +606,7 @@ requirements:
     tags:
     - playwright
     test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-008-e
-    status: red
+    status: green
 - id: REQ-009
   text: On startup the controller relaunches every session that was starting, running, or needs-input with claude --resume
     in its original slot and folder before accepting connections; a resume that exits non-zero within 5 seconds shows resume-failed
@@ -628,8 +628,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-009-a
-    status: red
+    test_ref: internal/tdd/lifecycle_test.go::SC-009-a
+    status: green
   - id: SC-009-b
     level: integration
     title: Failed resume is reported
@@ -642,8 +642,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-009-b
-    status: red
+    test_ref: internal/tdd/lifecycle_test.go::SC-009-b
+    status: green
   - id: SC-009-c
     level: integration
     title: Start fresh after a failed resume
@@ -655,8 +655,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-009-c
-    status: red
+    test_ref: internal/tdd/lifecycle_test.go::SC-009-c
+    status: green
   - id: SC-009-d
     level: unit
     title: State file durability and version guard
@@ -669,8 +669,8 @@ requirements:
     negative: true
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-009-d
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-009-d
+    status: green
 - id: REQ-010
   text: Stopping a session sends SIGHUP to its process group, then SIGKILL after 5 seconds; stopped or self-exited sessions
     show the exited message and always keep their worktree and branch.
@@ -689,8 +689,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs; real git
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-010-a
-    status: red
+    test_ref: internal/tdd/lifecycle_test.go::SC-010-a
+    status: green
   - id: SC-010-b
     level: integration
     title: Self-exit keeps the worktree
@@ -701,8 +701,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-010-b
-    status: red
+    test_ref: internal/tdd/lifecycle_test.go::SC-010-b
+    status: green
   - id: SC-010-c
     level: unit
     title: Stop confirmation
@@ -715,7 +715,7 @@ requirements:
     tags:
     - vitest
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-010-c
-    status: red
+    status: green
 - id: REQ-011
   text: Each session keeps the last 1 MiB of PTY output in memory and replays it to a connecting client before live output;
     multiple tabs mirror all panes and a PTY's size follows the tab that most recently sent input.
@@ -733,8 +733,8 @@ requirements:
     doubles: none; pure data structure
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-011-a
-    status: red
+    test_ref: internal/tdd/unit_test.go::SC-011-a
+    status: green
   - id: SC-011-b
     level: integration
     title: Replay precedes live output
@@ -745,8 +745,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-011-b
-    status: red
+    test_ref: internal/tdd/io_test.go::SC-011-b
+    status: green
   - id: SC-011-c
     level: integration
     title: Two tabs mirror; size follows last input
@@ -758,8 +758,8 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-011-c
-    status: red
+    test_ref: internal/tdd/io_test.go::SC-011-c
+    status: green
 - id: REQ-012
   text: ccctl install downloads the release binary for the host's OS and architecture, installs a launchd agent (KeepAlive
     true) or systemd user unit (Restart=always), records claude_path, and ccctl status prints the controller URL.
@@ -777,8 +777,8 @@ requirements:
     doubles: none; pure function
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-012-a
-    status: red
+    test_ref: internal/tdd/install_test.go::SC-012-a
+    status: green
   - id: SC-012-b
     level: unit
     title: systemd unit rendering
@@ -789,8 +789,8 @@ requirements:
     doubles: none; pure function
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-012-b
-    status: red
+    test_ref: internal/tdd/install_test.go::SC-012-b
+    status: green
   - id: SC-012-c
     level: unit
     title: Release asset selection
@@ -802,8 +802,8 @@ requirements:
     doubles: release metadata fixture
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-012-c
-    status: red
+    test_ref: internal/tdd/install_test.go::SC-012-c
+    status: green
   - id: SC-012-d
     level: unit
     title: Install records claude_path and secures config
@@ -814,8 +814,8 @@ requirements:
     doubles: fake PATH; temp HOME
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-012-d
-    status: red
+    test_ref: internal/tdd/install_test.go::SC-012-d
+    status: green
   - id: SC-012-e
     level: acceptance
     title: Install on mac-mini
@@ -855,8 +855,8 @@ requirements:
     tags:
     - nfr
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-013-a
-    status: red
+    test_ref: internal/tdd/io_test.go::SC-013-a
+    status: green
   - id: SC-013-b
     level: acceptance
     title: Controller memory ceiling
@@ -891,8 +891,8 @@ requirements:
     - nfr
     - ci
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-013-d
-    status: red
+    test_ref: internal/tdd/io_test.go::SC-013-d
+    status: green
 - id: REQ-014
   text: session_started and session_exited are written as JSON log lines with the §9 properties.
   priority: P2
@@ -910,6 +910,6 @@ requirements:
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
     - go
-    test_ref: internal/tdd/claude_code_controller_tdd_test.go::SC-014-a
-    status: red
+    test_ref: internal/tdd/lifecycle_test.go::SC-014-a
+    status: green
 
