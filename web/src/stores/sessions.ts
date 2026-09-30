@@ -41,6 +41,7 @@ export const useSessions = defineStore('sessions', {
     maximized: null as number | null,
     focusedSlot: null as number | null,
     launchSlot: null as number | null,
+    settingsOpen: false,
     liveMessage: '',
     conn: null as Connection | null,
   }),

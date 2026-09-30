@@ -56,7 +56,7 @@ Evidence: the user's request (§0). No existing tool covers this; `tmux` and `tt
 8. Per-session permission modes other than bypass (DL-008).
 9. Automatic worktree removal (DL-012).
 10. The risk-portfolio sentence in §0: it belongs to the day-trading-agent spec, not this one (DL-002).
-11. Managing Claude credentials, API keys, or billing: sessions use the host user's existing Claude Code login (A-007).
+11. Billing, and storing Claude credentials anywhere but the host's own config: sessions use the host user's existing Claude Code login unless the owner sets session variables such as `CLAUDE_CODE_OAUTH_TOKEN` in the Settings panel (A-007, DL-018).
 
 ## 5. User stories and acceptance criteria
 
@@ -169,7 +169,7 @@ All events are JSON log lines on the host only; nothing leaves the host (A-013).
 
 ## 12. Data and integrations
 
-- **Stored:** a state file `~/.ccctl/state.json` (mode 0600, written atomically on every state change) holding, per slot: slot number, task name, working directory, worktree path, branch, Claude session UUID, state, launch time. Config file `~/.ccctl/config.toml` holding `roots` (default `["~/projects", "~/Documents"]`, A-020), `claude_path` (A-022), `tailscale_path` (A-021), `port` (default 7681), `allowed_logins` (default: the host node's own login), `max_sessions` fixed at 4. Terminal output is held only in memory (1 MiB ring buffer per session) and never written to disk by the controller. Logs in `~/.ccctl/logs/`, rotated at 10 MB, 7 files kept (A-019). The only personal data is Tailscale login names in logs.
+- **Stored:** a state file `~/.ccctl/state.json` (mode 0600, written atomically on every state change) holding, per slot: slot number, task name, working directory, worktree path, branch, Claude session UUID, state, launch time. Config file `~/.ccctl/config.toml` holding `roots` (default `["~/projects", "~/Documents"]`, A-020), `claude_path` (A-022), `tailscale_path` (A-021), `port` (default 7681), `allowed_logins` (default: the host node's own login), `max_sessions` fixed at 4, and `env` (variables added to every session; set write-only from the page's Settings panel, DL-018). Terminal output is held only in memory (1 MiB ring buffer per session) and never written to disk by the controller. Logs in `~/.ccctl/logs/`, rotated at 10 MB, 7 files kept (A-019). The only personal data is Tailscale login names in logs.
 - **Migration:** none (first release).
 - **Integrations:**
   - **Tailscale (host daemon):** the CLI found by A-021, `status --json` every 10 seconds for `BackendState` and the Tailscale IPv4; WhoIs lookup of the caller's address for its login on each HTTP request and WebSocket upgrade (cached per remote address for 60 seconds). Authenticated by local socket access as the host user. Tests replace it with a Go interface fake.
@@ -236,6 +236,7 @@ All events are JSON log lines on the host only; nothing leaves the host (A-013).
 | DL-015 | acceptance | Which stories must work for v1 to count as shipped? | A. As proposed: launch, watch and type, only-me gate, Tailscale check, cap of 4 are P0; the rest P1 (recommended) B. Everything P0 C. Also promote needs-input alert and auto-resume | A | §5 |
 | DL-016 | states | With 3 sessions running and slot 4 holding an exited pane not yet closed, what should New session do? | A. Reuse the exited pane (recommended) B. Must close it first | A | §5 |
 | DL-017 | states | After a resume fails, what does Start fresh launch? | A. New session with a new UUID in the same slot, worktree, and branch (recommended) B. Open the launch form pre-filled | A | §5 |
+| DL-018 | integrations | Where should the owner set session environment variables such as CLAUDE_CODE_OAUTH_TOKEN and GEMINI_API_KEY? | A. Settings panel in the page (recommended) B. Config file only C. ccctl env command D. Per-session field | A: a write-only Settings panel storing `[env]` in `~/.ccctl/config.toml` (0600), applied to sessions launched afterwards; supersedes non-goal 11 in part | §4, §12 |
 
 ## Coverage
 

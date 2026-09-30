@@ -50,6 +50,7 @@ var Routes = []struct{ Method, Path string }{
 	{"GET", "/"}, {"GET", "/assets/x.js"}, {"GET", "/api/state"}, {"GET", "/api/repos"}, {"GET", "/api/inspect"},
 	{"POST", "/api/sessions"}, {"POST", "/api/sessions/1/stop"}, {"POST", "/api/sessions/1/fresh"},
 	{"POST", "/api/sessions/1/close"}, {"GET", "/ws"},
+	{"GET", "/api/settings/env"}, {"PUT", "/api/settings/env/X"}, {"DELETE", "/api/settings/env/X"},
 }
 
 func (s *Server) Handler() http.Handler {
@@ -60,6 +61,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/sessions", s.launch)
 	mux.HandleFunc("POST /api/sessions/{slot}/{action}", s.action)
 	mux.HandleFunc("GET /ws", s.ws)
+	mux.HandleFunc("GET /api/settings/env", s.envList)
+	mux.HandleFunc("PUT /api/settings/env/{name}", s.envSet)
+	mux.HandleFunc("DELETE /api/settings/env/{name}", s.envSet)
 	mux.HandleFunc("GET /", s.static)
 	return s.Guard.Wrap(mux)
 }
@@ -160,6 +164,45 @@ func (s *Server) action(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+// envList returns [env] names only; values are write-only.
+func (s *Server) envList(w http.ResponseWriter, r *http.Request) {
+	names, err := config.EnvNames(s.Home)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"names": names})
+}
+
+// envSet stores (PUT {"value"}) or removes (DELETE) one variable. Writing a
+// secret requires the page's own Origin, not just the allowlist.
+func (s *Server) envSet(w http.ResponseWriter, r *http.Request) {
+	if !auth.OriginOK(r) {
+		http.Error(w, "Cross-origin request refused.", http.StatusForbidden)
+		return
+	}
+	name := r.PathValue("name")
+	var value *string
+	if r.Method == http.MethodPut {
+		var body struct{ Value *string }
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&body); err != nil || body.Value == nil {
+			writeJSON(w, 400, map[string]string{"error": "Enter a value."})
+			return
+		}
+		value = body.Value
+	}
+	if err := config.SetEnv(s.Home, name, value); err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	action := "set"
+	if value == nil {
+		action = "removed"
+	}
+	s.Log.Info("settings_env_changed", "event", "settings_env_changed", "name", name, "action", action, "login", auth.LoginFrom(r.Context()))
+	s.envList(w, r)
 }
 
 func (s *Server) static(w http.ResponseWriter, r *http.Request) {

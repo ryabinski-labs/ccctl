@@ -3,7 +3,7 @@ feature: claude-code-controller
 title: Claude Code controller
 source:
   prd: docs/prd/claude-code-controller.md
-  prd_sha256: c70f7611af3a235bbd991fb5dad9967234f6ffbed1c5987e0ffc866ac409c61c
+  prd_sha256: 09a54d8326ffff4e11ba9ad64402b921bfd39bafe20519b1c5f17f37e71a4f9e
 defaults:
   priority: P2
 non_goals:
@@ -990,4 +990,33 @@ requirements:
     - go
     test_ref: internal/tdd/lifecycle_test.go::SC-014-a
     status: green
-
+- id: REQ-015
+  text: The owner sets session environment variables (for example CLAUDE_CODE_OAUTH_TOKEN) from a Settings panel; values are write-only, stored in config.toml with mode 0600, never logged, and reach sessions launched afterwards.
+  priority: P1
+  type: functional
+  prd_ref: §15 DL-018; §12 env
+  scenarios:
+  - id: SC-015-a
+    level: integration
+    title: Settings API is write-only and reaches sessions
+    given: config.toml with claude_path only
+    when: the page PUTs CLAUDE_CODE_OAUTH_TOKEN, lists names, tries reserved and cross-origin writes, launches a session, then DELETEs the variable
+    then: only names are ever returned, the file stays 0600 with other keys kept, reserved and cross-origin writes are refused, the session gets the value, and the log never contains it
+    oracle: PUT and GET bodies lack the value AND mode == 0600 AND claude_path kept AND PUT CCCTL_SOCK/PATH/1BAD == 400 AND cross-origin or Origin-less PUT == 403 AND session env has CLAUDE_CODE_OAUTH_TOKEN=value AND log lacks the value AND 2 settings_env_changed events
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/launch_test.go::SC-015-a
+    status: green
+  - id: SC-015-b
+    level: unit
+    title: Settings dialog never shows a saved value and confirms removal
+    given: a dialog listing GEMINI_API_KEY
+    when: the owner saves CLAUDE_CODE_OAUTH_TOKEN, then presses Remove on GEMINI_API_KEY and confirms
+    then: the value field is a cleared password field and the value never appears in the DOM; removal waits for confirmation
+    oracle: input type == password AND body HTML lacks the value after save AND input value == '' AND envRemove not called before confirm AND called with GEMINI_API_KEY after
+    doubles: mocked API
+    tags:
+    - vitest
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-015-b
+    status: green

@@ -32,4 +32,10 @@ export const api = {
   stop: (slot: number) => call<object>('POST', `/api/sessions/${slot}/stop`),
   fresh: (slot: number) => call<{ slot: number; info: SlotInfo }>('POST', `/api/sessions/${slot}/fresh`),
   close: (slot: number) => call<object>('POST', `/api/sessions/${slot}/close`),
+  /** Session environment ([env] in config.toml). Names only; values are write-only. */
+  envNames: () => call<{ names: string[] }>('GET', '/api/settings/env').then((r) => r.names ?? []),
+  envSet: (name: string, value: string) =>
+    call<{ names: string[] }>('PUT', `/api/settings/env/${encodeURIComponent(name)}`, { value }).then((r) => r.names ?? []),
+  envRemove: (name: string) =>
+    call<{ names: string[] }>('DELETE', `/api/settings/env/${encodeURIComponent(name)}`).then((r) => r.names ?? []),
 };

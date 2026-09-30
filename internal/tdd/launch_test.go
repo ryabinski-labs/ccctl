@@ -3,6 +3,7 @@ package tdd
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -202,5 +203,56 @@ func TestSc001DConfigEnvReachesEverySessionAndReloads(t *testing.T) {
 	}
 	if strings.Contains(h.Log.String(), "key-one") || strings.Contains(h.Log.String(), "key-two") {
 		t.Fatal("a key value reached the log")
+	}
+}
+
+// SC-015-a
+func TestSc015ASettingsPanelEnvIsWriteOnlyAndReachesSessions(t *testing.T) {
+	h := tu.Start(t, tu.Opts{})
+	cfgPath := filepath.Join(h.Home, ".ccctl", "config.toml")
+	os.WriteFile(cfgPath, []byte("claude_path = \"/keep/me\"\n"), 0o600)
+	const secret = "sk-ant-oat01-SECRET"
+	code, body := h.Do("PUT", "/api/settings/env/CLAUDE_CODE_OAUTH_TOKEN", map[string]string{"value": secret})
+	if code != 200 || strings.Contains(string(body), secret) || !strings.Contains(string(body), "CLAUDE_CODE_OAUTH_TOKEN") {
+		t.Fatalf("PUT = %d %s", code, body)
+	}
+	if _, b := h.Do("GET", "/api/settings/env", nil); strings.Contains(string(b), secret) || !strings.Contains(string(b), `"CLAUDE_CODE_OAUTH_TOKEN"`) {
+		t.Fatalf("list = %s", b)
+	}
+	fi, _ := os.Stat(cfgPath)
+	raw, _ := os.ReadFile(cfgPath)
+	if fi.Mode().Perm() != 0o600 || !strings.Contains(string(raw), "/keep/me") {
+		t.Fatalf("config mode %v or other keys lost:\n%s", fi.Mode().Perm(), raw)
+	}
+	for _, bad := range []string{"CCCTL_SOCK", "PATH", "1BAD"} {
+		if code, _ := h.Do("PUT", "/api/settings/env/"+bad, map[string]string{"value": "x"}); code != 400 {
+			t.Errorf("PUT %s = %d", bad, code)
+		}
+	}
+	req, _ := http.NewRequest("PUT", h.URL()+"/api/settings/env/EVIL", strings.NewReader(`{"value":"x"}`))
+	req.Header.Set("Origin", "https://evil.example")
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != 403 {
+		t.Errorf("cross-origin PUT not refused: %v %v", resp, err)
+	}
+	req, _ = http.NewRequest("PUT", h.URL()+"/api/settings/env/EVIL", strings.NewReader(`{"value":"x"}`))
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != 403 {
+		t.Errorf("PUT without Origin not refused: %v %v", resp, err)
+	}
+	d := filepath.Join(h.Root, "s")
+	os.MkdirAll(d, 0o755)
+	h.Launch("with-token", d, false, "")
+	tu.Eventually(t, 5*time.Second, func() bool { return len(h.Invocations()) == 1 }, "not started")
+	var env []string
+	for _, e := range h.Invocations()[0]["env"].([]any) {
+		env = append(env, e.(string))
+	}
+	if !slices.Contains(env, "CLAUDE_CODE_OAUTH_TOKEN="+secret) {
+		t.Fatal("session did not get the token")
+	}
+	if code, b := h.Do("DELETE", "/api/settings/env/CLAUDE_CODE_OAUTH_TOKEN", nil); code != 200 || strings.Contains(string(b), "CLAUDE_CODE_OAUTH_TOKEN") {
+		t.Fatalf("DELETE = %d %s", code, b)
+	}
+	if strings.Contains(h.Log.String(), secret) || len(h.Log.Events("settings_env_changed")) != 2 {
+		t.Fatalf("log leaked the value or missed events")
 	}
 }

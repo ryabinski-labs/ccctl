@@ -44,6 +44,12 @@ defineProps<{ name: string; size?: number }>();
     <template v-else-if="name === 'keyboard'">
       <rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h.01M11 10h.01M15 10h.01M17 10h.01M7 14h10" />
     </template>
+    <template v-else-if="name === 'settings'">
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" />
+    </template>
+    <template v-else-if="name === 'key'">
+      <circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M17 6l3 3M15 8l2 2" />
+    </template>
     <template v-else-if="name === 'refresh'">
       <path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 5v6h-6" />
     </template>

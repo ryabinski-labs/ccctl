@@ -275,18 +275,6 @@ var inheritedMarkers = map[string]bool{
 	"CLAUDE_CODE_STOP_HOOK_BLOCK_CAP": true, "CLAUDE_CODE_SSE_PORT": true,
 }
 
-func validEnvKey(k string) bool {
-	if k == "" {
-		return false
-	}
-	for i, c := range k {
-		if !(c == '_' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || i > 0 && c >= '0' && c <= '9') {
-			return false
-		}
-	}
-	return true
-}
-
 func (m *Manager) env(slot int) []string {
 	var env []string
 	for _, e := range m.opt.Env {
@@ -297,7 +285,7 @@ func (m *Manager) env(slot int) []string {
 	}
 	if m.opt.SessionEnv != nil {
 		for k, v := range m.opt.SessionEnv() {
-			if validEnvKey(k) && k != "TERM" && !strings.HasPrefix(k, "CCCTL_") {
+			if config.ValidEnvName(k) && !config.ReservedEnv(k) {
 				env = append(env, k+"="+v)
 			}
 		}

@@ -6,6 +6,7 @@ import { handleShortcut } from './lib/shortcuts';
 import { useSessions } from './stores/sessions';
 import AppHeader from './components/AppHeader.vue';
 import LaunchDialog from './components/LaunchDialog.vue';
+import SettingsDialog from './components/SettingsDialog.vue';
 import PaneGrid from './components/PaneGrid.vue';
 import ReconnectBanner from './components/ReconnectBanner.vue';
 
@@ -41,6 +42,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
     <ReconnectBanner />
     <PaneGrid />
     <LaunchDialog v-if="store.launchSlot !== null" :slot="store.launchSlot" @close="store.closeLaunch()" />
+    <SettingsDialog v-if="store.settingsOpen" @close="store.settingsOpen = false" />
     <div class="sr-only" aria-live="polite" aria-atomic="true">{{ store.liveMessage }}</div>
   </div>
 </template>

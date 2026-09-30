@@ -16,6 +16,9 @@ vi.mock('../lib/api', () => {
   return {
     ApiError,
     api: {
+      envNames: vi.fn(async () => []),
+      envSet: vi.fn(async () => []),
+      envRemove: vi.fn(async () => []),
       repos: vi.fn(async () => [{ name: 'notes', path: '/h/notes', display: '~/notes' }]),
       inspect: vi.fn(async (path: string) => ({
         path,
@@ -252,5 +255,34 @@ describe('REQ-006 — stale page after an upgrade', () => {
     const w = mount(ReconnectBanner);
     await flushPromises();
     expect(w.get('[data-testid="updated-banner"]').text()).toContain('ccctl on mac-mini was updated. Reload to use the new version');
+  });
+});
+
+describe('REQ-015 — session environment is set from the page and is write-only', () => {
+  it('SC-015-b Settings dialog never shows a saved value and confirms removal', async () => {
+    setActivePinia(createPinia());
+    const { default: SettingsDialog } = await import('../components/SettingsDialog.vue');
+    let names: string[] = ['GEMINI_API_KEY'];
+    const set = vi.spyOn(api, 'envSet').mockImplementation(async (n) => (names = [...names, n].sort()));
+    vi.spyOn(api, 'envNames').mockImplementation(async () => names);
+    const rm = vi.spyOn(api, 'envRemove').mockImplementation(async (n) => (names = names.filter((x) => x !== n)));
+    const w = mount(SettingsDialog, { attachTo: document.body });
+    await flushPromises();
+    expect(w.findAll('[data-testid="env-row"]').map((r) => r.text())).toEqual([expect.stringContaining('GEMINI_API_KEY')]);
+    await w.get('#env-name').setValue('CLAUDE_CODE_OAUTH_TOKEN');
+    await w.get('#env-value').setValue('sk-ant-oat01-SECRET');
+    expect(w.get('#env-value').attributes('type')).toBe('password');
+    await w.get('form').trigger('submit');
+    await flushPromises();
+    expect(set).toHaveBeenCalledWith('CLAUDE_CODE_OAUTH_TOKEN', 'sk-ant-oat01-SECRET');
+    expect(document.body.innerHTML).not.toContain('sk-ant-oat01-SECRET');
+    expect((w.get('#env-value').element as HTMLInputElement).value).toBe('');
+    expect(w.get('[data-testid="env-saved"]').text()).toContain('CLAUDE_CODE_OAUTH_TOKEN saved');
+    await w.get('[aria-label="Remove GEMINI_API_KEY"]').trigger('click');
+    expect(rm).not.toHaveBeenCalled();
+    await w.get('.btn--danger').trigger('click');
+    await flushPromises();
+    expect(rm).toHaveBeenCalledWith('GEMINI_API_KEY');
+    w.unmount();
   });
 });

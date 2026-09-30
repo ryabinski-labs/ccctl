@@ -81,6 +81,10 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
     </p>
 
     <div class="tools" data-header-tools>
+      <button type="button" class="btn btn--ghost btn--sm" data-testid="settings-open" @click="store.settingsOpen = true">
+        <AppIcon name="settings" :size="16" />Settings
+      </button>
+
       <div ref="keysWrap" class="keys-wrap" @focusout="onFocusOut">
         <button
           type="button"

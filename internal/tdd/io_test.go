@@ -133,6 +133,9 @@ var tsRe = regexp.MustCompile(`TS (\d+) (\d+)\r\n`)
 
 // SC-013-a
 func TestSc013AControllerAddedOutputLatency(t *testing.T) {
+	if raceEnabled {
+		t.Skip("latency budget applies to normal builds; CI runs this test without -race")
+	}
 	h := tu.Start(t, tu.Opts{Mode: "ticker=2500"})
 	ws := h.Dial()
 	launchN(h, 4)

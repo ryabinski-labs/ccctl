@@ -27,6 +27,8 @@ const worktree = ref(true);
 const prompt = ref('');
 const submitting = ref(false);
 const serverError = ref('');
+// Custom-path problem, shown under the Folder field (not in the footer error block).
+const pathError = ref('');
 const activeIndex = ref(0);
 const errorBox = ref<HTMLElement | null>(null);
 
@@ -56,11 +58,14 @@ const selectedDisplay = computed(() => {
 
 const preview = computed(() => {
   if (!worktree.value || !worktreeAllowed.value || !selectedDisplay.value || !taskValid.value) return '';
+  if (useCustom.value && (!inspection.value || pathError.value)) return ''; // never preview an unverified path
   const d = selectedDisplay.value.replace(/\/+$/, '');
   return `Creates ${d}-wt-${normalizedTask.value} on branch ctl/${normalizedTask.value}`;
 });
 
-const canSubmit = computed(() => !submitting.value && !!folderPath.value && prompt.value.length <= PROMPT_MAX);
+const canSubmit = computed(
+  () => !submitting.value && !!folderPath.value && !pathError.value && prompt.value.length <= PROMPT_MAX,
+);
 
 let inspectSeq = 0;
 async function inspect(path: string) {
@@ -75,10 +80,11 @@ async function inspect(path: string) {
     if (seq !== inspectSeq) return;
     inspection.value = r;
     serverError.value = '';
+    pathError.value = '';
   } catch (e) {
     if (seq !== inspectSeq) return;
     inspection.value = null;
-    if (useCustom.value && e instanceof ApiError) serverError.value = e.message;
+    if (useCustom.value && e instanceof ApiError) pathError.value = e.message;
   } finally {
     if (seq === inspectSeq) inspecting.value = false;
   }
@@ -114,12 +120,15 @@ watch(query, () => (activeIndex.value = 0));
 let customTimer: ReturnType<typeof setTimeout> | null = null;
 watch(customPath, (p) => {
   if (!useCustom.value) return;
+  pathError.value = '';
+  inspection.value = null;
   if (customTimer) clearTimeout(customTimer);
   customTimer = setTimeout(() => void inspect(p.trim()), 300);
 });
 
 watch(useCustom, (on) => {
   inspection.value = null;
+  pathError.value = '';
   if (on && customPath.value.trim()) void inspect(customPath.value.trim());
   if (!on && selected.value) void inspect(selected.value);
 });
@@ -250,10 +259,13 @@ onMounted(async () => {
             class="input mono"
             name="path"
             aria-label="Custom folder path"
+            :aria-invalid="!!pathError"
+            :aria-describedby="pathError ? 'launch-path-error' : undefined"
             placeholder="/Users/me/code/project"
             autocomplete="off"
             spellcheck="false"
           />
+          <p v-if="pathError" id="launch-path-error" class="hint hint--err" role="alert" data-testid="path-error">{{ pathError }}</p>
           <button type="button" class="linkish" @click="useCustom = false">Pick from scanned repositories</button>
         </template>
       </fieldset>

@@ -27,6 +27,8 @@ jobs:
       - run: npm --prefix web run build
       - run: go vet ./...
       - run: go test -race -timeout 10m ./...
+      - name: Latency budget (SC-013-a, normal build)
+        run: go test -count=1 -run 'TestSc013A' ./internal/tdd/
 
   e2e:
     runs-on: [self-hosted, Linux, X64]

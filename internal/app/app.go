@@ -225,8 +225,9 @@ func (a *App) check(ctx context.Context) {
 			a.lastBindErr = ""
 		}
 	case tailscale.Unbind:
-		a.unbind()
+		// Log before closing so the event always precedes the observable unbind.
 		logx.Event(a.opt.Log, "tailscale_down", "backend_state", st.BackendState)
+		a.unbind()
 	}
 	msg := ""
 	if st.BackendState != "Running" {
