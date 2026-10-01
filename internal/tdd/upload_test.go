@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ryabinski-labs/claude-code-controller/internal/server"
 	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
 )
 
@@ -76,5 +78,58 @@ func TestUploadRefusals(t *testing.T) {
 	}
 	if ents, _ := os.ReadDir(filepath.Join(h.Home, ".ccctl", "uploads")); len(ents) != 0 {
 		t.Errorf("refused uploads left %d files", len(ents))
+	}
+}
+
+func TestUploadRefusedForEndedSession(t *testing.T) {
+	h := tu.Start(t, tu.Opts{})
+	launchN(h, 1)
+	if code, b := h.Do("POST", "/api/sessions/1/stop", nil); code != 202 {
+		t.Fatalf("stop: %d %s", code, b)
+	}
+	tu.Eventually(t, 10*time.Second, func() bool {
+		s := h.Slot(1)
+		return s != nil && !s.State.Active()
+	}, "session never ended")
+	if code, _ := postUpload(t, h, "1", "late.txt", []byte("x"), h.URL()); code != 409 {
+		t.Errorf("upload to ended session: %d, want 409", code)
+	}
+	if ents, _ := os.ReadDir(filepath.Join(h.Home, ".ccctl", "uploads")); len(ents) != 0 {
+		t.Errorf("refused upload left %d files", len(ents))
+	}
+}
+
+func TestUploadPrunesOldFilesButNotOthers(t *testing.T) {
+	h := tu.Start(t, tu.Opts{})
+	launchN(h, 1)
+	dir := filepath.Join(h.Home, ".ccctl", "uploads")
+	os.MkdirAll(dir, 0o700)
+	old := filepath.Join(dir, "20200101-000000-aabbcc-old.png")
+	stranger := filepath.Join(dir, "notes-i-keep.txt") // not ours: wrong name shape
+	for _, f := range []string{old, stranger} {
+		os.WriteFile(f, []byte("x"), 0o600)
+		os.Chtimes(f, time.Now().Add(-30*24*time.Hour), time.Now().Add(-30*24*time.Hour))
+	}
+	if code, b := postUpload(t, h, "1", "new.txt", []byte("y"), h.URL()); code != 201 {
+		t.Fatalf("upload: %d %s", code, b)
+	}
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Errorf("old upload was not pruned (%v)", err)
+	}
+	if _, err := os.Stat(stranger); err != nil {
+		t.Errorf("a file ccctl did not create was removed: %v", err)
+	}
+}
+
+func TestUploadRefusedWhenFolderIsFull(t *testing.T) {
+	h := tu.Start(t, tu.Opts{})
+	launchN(h, 1)
+	dir := filepath.Join(h.Home, ".ccctl", "uploads")
+	os.MkdirAll(dir, 0o700)
+	f, _ := os.Create(filepath.Join(dir, time.Now().Format("20060102-150405")+"-aabbcc-big.bin"))
+	f.Truncate(server.MaxUploadDir + 1) // sparse: no real disk used
+	f.Close()
+	if code, _ := postUpload(t, h, "1", "a.txt", []byte("x"), h.URL()); code != 507 {
+		t.Errorf("upload into a full folder: %d, want 507", code)
 	}
 }

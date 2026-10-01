@@ -18,8 +18,40 @@ import (
 	"github.com/ryabinski-labs/claude-code-controller/internal/session"
 )
 
-// MaxUpload is the largest file one upload may carry.
-const MaxUpload = 25 << 20
+const (
+	// MaxUpload is the largest file one upload may carry.
+	MaxUpload = 25 << 20
+	// MaxUploadDir caps the total size of the uploads folder.
+	MaxUploadDir = 1 << 30
+	// UploadKeep is how long an upload is kept before a later upload removes it.
+	UploadKeep = 14 * 24 * time.Hour
+	// uploadReadLimit is how long one upload body may take to arrive.
+	uploadReadLimit = 5 * time.Minute
+)
+
+// ourUpload matches the names upload() creates, so pruning never touches other files.
+var ourUpload = regexp.MustCompile(`^\d{8}-\d{6}-[0-9a-f]{6}-`)
+
+// pruneUploads removes uploads older than UploadKeep and returns the size of what is left.
+func pruneUploads(dir string, now time.Time) int64 {
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	var total int64
+	for _, e := range ents {
+		info, err := e.Info()
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		if ourUpload.MatchString(e.Name()) && now.Sub(info.ModTime()) > UploadKeep {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+			continue
+		}
+		total += info.Size()
+	}
+	return total
+}
 
 var unsafeName = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
@@ -45,7 +77,8 @@ func uploadName(raw string) string {
 
 // upload stores one file from the page under ~/.ccctl/uploads and returns its
 // absolute path, so the page can paste that path into the session. The session
-// runs as the same user, so Claude Code can read it. Uploads are never removed.
+// runs as the same user, so Claude Code can read it. Each upload also removes
+// ccctl's own uploads older than UploadKeep.
 func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 	if !auth.OriginOK(r) {
 		http.Error(w, "Cross-origin request refused.", http.StatusForbidden)
@@ -56,8 +89,13 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, session.ErrNotFound)
 		return
 	}
-	if info := s.M.Slots(); slot < 1 || slot > len(info) || info[slot-1] == nil {
+	info := s.M.Slots()
+	if slot < 1 || slot > len(info) || info[slot-1] == nil {
 		writeErr(w, session.ErrNotFound)
+		return
+	}
+	if !info[slot-1].State.Active() {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "That session has ended."})
 		return
 	}
 	dir := filepath.Join(config.Dir(s.Home), "uploads")
@@ -65,6 +103,11 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	if pruneUploads(dir, time.Now()) >= MaxUploadDir {
+		writeJSON(w, http.StatusInsufficientStorage, map[string]string{"error": "The upload folder on the host is full. Remove old files from ~/.ccctl/uploads."})
+		return
+	}
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadReadLimit))
 	var rnd [3]byte
 	_, _ = rand.Read(rnd[:])
 	name := time.Now().Format("20060102-150405") + "-" + hex.EncodeToString(rnd[:]) + "-" + uploadName(r.URL.Query().Get("name"))
