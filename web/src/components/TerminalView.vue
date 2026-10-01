@@ -89,14 +89,14 @@ function bufferText(): string {
 
 onMounted(async () => {
   try {
-    await document.fonts?.load?.('13px "IBM Plex Mono"');
+    await document.fonts?.load?.('10px "IBM Plex Mono"');
   } catch {
     /* fall back to metrics of the fallback font */
   }
   if (!host.value) return;
   term = new Terminal({
     fontFamily: '"IBM Plex Mono", ui-monospace, Menlo, monospace',
-    fontSize: 13,
+    fontSize: 10,
     lineHeight: 1.12,
     cursorBlink: true,
     allowProposedApi: true,
