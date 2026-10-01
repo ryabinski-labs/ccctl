@@ -4,6 +4,7 @@ Notable changes to ccctl. Release binaries and their notes are on the [Releases 
 
 ## Unreleased
 
+- Run up to six sessions (was four). The pane grid now grows with the number of open sessions: one pane fills the page, two sit side by side, three or four make a 2x2, five or six make a 3x2. The "Start a session" card only appears when the grid has a spare cell, and `Ctrl+Shift+1` to `6` focus the panes.
 - Pane buttons are now 32 px, the attach button keeps keyboard focus and shows a spinner while a file uploads, and an upload error shows above the terminal (with a dismiss button) instead of covering it.
 - The page has a real `<h1>`, and missing file-like paths such as `/robots.txt` return 404 instead of the page.
 - README: phone layouts are not supported (the page needs a window at least 1024 px wide).

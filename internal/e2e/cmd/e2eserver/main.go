@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	n := flag.Int("slots-folders", 4, "number of Documents/repoN git repos to create")
+	n := flag.Int("slots-folders", config.MaxSessions, "number of Documents/repoN git repos to create")
 	flag.Parse()
 	self, _ := os.Executable()
 	binDir := filepath.Dir(self)

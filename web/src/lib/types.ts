@@ -36,11 +36,11 @@ export interface LaunchRequest {
   slot?: number;
 }
 
-export const MAX_SESSIONS = 4;
+export const MAX_SESSIONS = 6;
 export const ACTIVE_STATES: SessionState[] = ['starting', 'running', 'needs-input'];
 
 export const TEXT = {
-  allSlotsInUse: 'All 4 slots are in use. Stop or close a session first.',
+  allSlotsInUse: `All ${MAX_SESSIONS} slots are in use. Stop or close a session first.`,
   notGit: 'Not a git repository: session runs in the folder itself.',
   taskRule: 'Task name must be 1 to 40 characters of a-z, 0-9 or -, and unique among open sessions.',
   stopConfirm: (task: string) => `Stop ${task}? The worktree and branch are kept.`,

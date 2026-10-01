@@ -18,7 +18,7 @@ created: 2026-09-30
 
 ## 1. Problem
 
-The user runs several Claude Code tasks in parallel on a workstation and has no way to watch or steer them from another device. Today that means SSH plus manual terminal juggling, one session per SSH window, with no signal when a session stops and waits for input. The user wants to supervise up to four Claude Code sessions, each on its own task, from a web browser on any device in their Tailscale tailnet: see every session's live terminal output and type into any of them.
+The user runs several Claude Code tasks in parallel on a workstation and has no way to watch or steer them from another device. Today that means SSH plus manual terminal juggling, one session per SSH window, with no signal when a session stops and waits for input. The user wants to supervise up to six Claude Code sessions, each on its own task, from a web browser on any device in their Tailscale tailnet: see every session's live terminal output and type into any of them.
 
 Evidence: the user's request (§0). No existing tool covers this; `tmux` and `ttyd` are installed on neither Mac (checked 2026-09-30).
 
@@ -42,7 +42,7 @@ Evidence: the user's request (§0). No existing tool covers this; `tmux` and `tt
 ## 4. Goals and non-goals
 
 **Goals**
-1. Run up to 4 concurrent Claude Code sessions on one host, each in its own pane of a 2x2 browser grid, with live output and full keyboard input (DL-001, DL-010).
+1. Run up to 6 concurrent Claude Code sessions on one host, each in its own pane of a browser grid that grows with the number of open sessions (1 pane, 2 side by side, 2x2 for 3 or 4, 3x2 for 5 or 6), with live output and full keyboard input (DL-001, DL-010, DL-019).
 2. Reach the controller only over the host's existing Tailscale connection, only as the allowlisted Tailscale login (DL-006, DL-007, DL-009).
 3. Isolate each task in its own git worktree and bring every live session back after a controller or host restart (DL-005, DL-013).
 4. Tell the user which pane is waiting for input without them reading every pane (DL-005).
@@ -53,7 +53,7 @@ Evidence: the user's request (§0). No existing tool covers this; `tmux` and `tt
 3. Controlling sessions on more than one host from one page: one controller per host (DL-001).
 4. tmux integration or attaching to sessions over SSH: sessions live inside the controller process (DL-001).
 5. Read-only viewers or multi-user roles: single owner only (DL-006).
-6. More than 4 concurrent sessions (DL-010).
+6. More than 6 concurrent sessions (DL-010, DL-019).
 7. HTTPS, TLS certificates, and OS-level browser notifications: plain HTTP on the Tailscale IP (DL-009).
 8. Per-session permission modes other than bypass (DL-008).
 9. Automatic worktree removal (DL-012).
@@ -62,7 +62,7 @@ Evidence: the user's request (§0). No existing tool covers this; `tmux` and `tt
 
 ## 5. User stories and acceptance criteria
 
-Terms: a **slot** is one of the 4 grid panes (1 to 4). A **session** is one `claude` process running in a pseudo-terminal (PTY) owned by the controller. Session states: `starting`, `running`, `needs-input`, `exited`, `resume-failed`. Allowed transitions: `starting` to `running`; `running` to `needs-input` and back; `running` or `needs-input` to `exited`; `starting` (on resume) to `resume-failed`. A slot is free when it has no session or its session is `exited` or `resume-failed`, whether or not the user closed the pane (DL-016). A new launch takes the lowest-numbered free slot and replaces any exited pane in it; the replaced session's worktree and branch are untouched.
+Terms: a **slot** is one of the 6 possible grid panes (1 to 6). A **session** is one `claude` process running in a pseudo-terminal (PTY) owned by the controller. Session states: `starting`, `running`, `needs-input`, `exited`, `resume-failed`. Allowed transitions: `starting` to `running`; `running` to `needs-input` and back; `running` or `needs-input` to `exited`; `starting` (on resume) to `resume-failed`. A slot is free when it has no session or its session is `exited` or `resume-failed`, whether or not the user closed the pane (DL-016). A new launch takes the lowest-numbered free slot and replaces any exited pane in it; the replaced session's worktree and branch are untouched.
 
 Permission matrix (DL-006): the only role is **owner** = a Tailscale login listed in `allowed_logins` (default: the Tailscale login of the host's own node, A-006). The owner may view, launch, type into, stop, close, and resume sessions. Any other caller may do nothing and receives HTTP 403.
 
@@ -75,9 +75,9 @@ Permission matrix (DL-006): the only role is **owner** = a Tailscale login liste
   - [ ] Given a task name that is empty, longer than 40 characters, contains characters outside `a-z 0-9 -` after lowercasing, or equals a live session's name, when I press Start, then the form shows `Task name must be 1 to 40 characters of a-z, 0-9 or -, and unique among open sessions.` and no session starts.
   - [ ] Given the configured `claude_path` does not point to an executable file, when I press Start, then the form shows `Claude Code was not found at CLAUDE_PATH. Set claude_path in ~/.ccctl/config.toml.` and no session starts.
 - **[P0]** As the owner, I want to see every session's live terminal output and type into any pane, so that I can steer each task.
-  - [ ] Given 4 running sessions, when any session writes output, then that pane renders it within 250 milliseconds at p95 over the tailnet, and the other 3 panes keep rendering their own output.
+  - [ ] Given 6 running sessions, when any session writes output, then that pane renders it within 250 milliseconds at p95 over the tailnet, and the other 5 panes keep rendering their own output.
   - [ ] Given I focus pane 2 and type `hello`, Enter, Esc, Ctrl-C, or arrow keys, when the keys are sent, then session 2's PTY receives exactly those bytes and no other session receives them.
-  - [ ] Given I click a pane's header maximize button, when the page re-renders, then that pane fills the grid area and the PTY is resized to the new rows and columns; clicking restore returns to 2x2.
+  - [ ] Given I click a pane's header maximize button, when the page re-renders, then that pane fills the grid area and the PTY is resized to the new rows and columns; clicking restore returns to the grid for the open sessions.
 - **[P0]** As the owner, I want only my Tailscale identity to reach the controller, so that nobody else gets a shell on my host.
   - [ ] Given a request from a tailnet login not in `allowed_logins`, when it loads the page or opens the WebSocket, then the controller answers HTTP 403 with the page `Not authorized: LOGIN is not on this controller's allowlist.` (LOGIN replaced by the caller's login) and writes an `auth_denied` log line.
   - [ ] Given a WebSocket upgrade whose `Origin` header does not equal the controller's own origin, when it arrives, then the controller rejects it with HTTP 403.
@@ -86,13 +86,13 @@ Permission matrix (DL-006): the only role is **owner** = a Tailscale login liste
   - [ ] Given Tailscale on the host is stopped or logged out at controller start, when the controller starts, then it writes `Tailscale is not running on this host. Start the Tailscale app or run: sudo tailscale up. Retrying every 10 seconds.` to its log and to `ccctl status`, serves nothing, and binds within 10 seconds of Tailscale reporting `Running`.
   - [ ] Given the controller is serving and host Tailscale stops, when the next 10-second check runs, then the controller closes its listener, writes `tailscale_down`, keeps all sessions running, and re-binds when Tailscale returns.
   - [ ] Given an open page whose WebSocket drops, when the drop is detected, then the page shows the banner `Lost connection to HOST. Check that Tailscale is on for this device and for HOST. Retrying in N s.` and retries after 1, 2, 4, 8, 16, then every 30 seconds until it reconnects.
-- **[P0]** As the owner, I want at most 4 sessions at once, so that the grid and the host stay within the stated limit (DL-010).
-  - [ ] Given 3 slots hold running sessions and slot 4 holds an `exited` pane that was not closed, when I launch a new session, then it starts in slot 4, replacing the exited pane, and the exited session's worktree folder and branch still exist (DL-016).
-  - [ ] Given 4 slots hold sessions that are `starting`, `running`, or `needs-input`, when the page renders, then the New session control is disabled with the tooltip `All 4 slots are in use. Stop or close a session first.`, and a direct API launch request returns HTTP 409 with the same text.
-- **[P1]** As the owner, I want a pane to flag when its session is waiting for me, so that I do not have to read all four panes.
+- **[P0]** As the owner, I want at most 6 sessions at once, so that the grid and the host stay within the stated limit (DL-010).
+  - [ ] Given 5 slots hold running sessions and slot 6 holds an `exited` pane that was not closed, when I launch a new session, then it starts in slot 6, replacing the exited pane, and the exited session's worktree folder and branch still exist (DL-016).
+  - [ ] Given 6 slots hold sessions that are `starting`, `running`, or `needs-input`, when the page renders, then the New session control is disabled with the tooltip `All 6 slots are in use. Stop or close a session first.`, and a direct API launch request returns HTTP 409 with the same text.
+- **[P1]** As the owner, I want a pane to flag when its session is waiting for me, so that I do not have to read all the panes.
   - [ ] Given a running session, when Claude Code fires its `Notification` hook or its `Stop` hook, then within 2 seconds that pane's header turns amber with the label `Needs input`, the browser tab title is prefixed with the count of such panes in parentheses, and a single chime plays unless muted in the page header.
   - [ ] Given a pane in `needs-input`, when any keystroke is sent to it, then the label clears and the state returns to `running`.
-- **[P1]** As the owner, I want live sessions to come back after the controller or the host restarts, so that a reboot does not lose my four tasks (DL-013).
+- **[P1]** As the owner, I want live sessions to come back after the controller or the host restarts, so that a reboot does not lose my running tasks (DL-013).
   - [ ] Given 3 sessions in `running` or `needs-input` when the controller stops, when it starts again, then each is relaunched in its original slot and working directory with `claude --resume SESSION_ID --dangerously-skip-permissions`, before any browser connects.
   - [ ] Given a resumed `claude` exits with a non-zero code within 5 seconds, when this happens, then the pane shows `Could not resume TASK (exit code N).` with buttons Start fresh and Close, and writes a `resume_failed` log line.
   - [ ] Given a pane in `resume-failed` for task TASK, when I press Start fresh, then a new `claude` starts in the same slot, working directory, worktree, and branch under the same task name, with a new session UUID and without `--resume`, and the state file records the new UUID (DL-017).
@@ -113,7 +113,7 @@ Priorities: **P0** release fails without it · **P1** ship-blocking unless waive
 ## 6. Experience notes
 
 - **Surface:** one single-page web app served by the controller at `http://TAILSCALE_IP:7681/`, plus the `ccctl` CLI on the host (`ccctl serve`, `ccctl install`, `ccctl uninstall`, `ccctl status`, `ccctl hook`). CLI exit codes: 0 success, 1 runtime error, 2 usage error, 3 Tailscale not running (for `status`).
-- **Main screen:** a header with the host name, a mute toggle for the chime, and a New session button; below it a 2x2 grid of panes. Each pane header shows slot number, task name, repo folder name, branch, state badge (`Starting`, `Running`, `Needs input`, `Exited`, `Resume failed`), and buttons Maximize and Stop. Panes use xterm.js with the fit add-on.
+- **Main screen:** a header with the host name, a mute toggle for the chime, and a New session button; below it a grid of panes that resizes with the number of open sessions (DL-019); the free slot shows a Start a session card only when the grid has a spare cell. Each pane header shows slot number, task name, repo folder name, branch, state badge (`Starting`, `Running`, `Needs input`, `Exited`, `Resume failed`), and buttons Maximize and Stop. Panes use xterm.js with the fit add-on.
 - **Empty state:** a free slot shows `Slot N is free` and a Start a session button that opens the launch form bound to that slot.
 - **Launch form (modal):** task name; repo list (searchable, git repos found up to 3 folder levels under each configured root; default roots `~/projects` and `~/Documents`, missing roots skipped, plus the home folder itself at depth 1 (A-020)); custom path field; worktree toggle (default on for git repos); optional first prompt (multi-line, 10,000 character limit). Start and Cancel.
 - **Loading state:** a pane in `starting` shows a spinner and `Starting claude in PATH`.
@@ -123,7 +123,7 @@ Priorities: **P0** release fails without it · **P1** ship-blocking unless waive
 
 ## 7. Scope
 
-**In scope:** the `ccctl` Go binary with embedded Vue 3 + xterm.js frontend; PTY session management for up to 4 `claude` processes; Tailscale state check and Tailscale-IP-only listener; WhoIs allowlist; git worktree creation; needs-input detection through Claude Code hooks; state file and auto-resume; scrollback replay; launchd and systemd install; GitHub Actions CI and release builds.
+**In scope:** the `ccctl` Go binary with embedded Vue 3 + xterm.js frontend; PTY session management for up to 6 `claude` processes; Tailscale state check and Tailscale-IP-only listener; WhoIs allowlist; git worktree creation; needs-input detection through Claude Code hooks; state file and auto-resume; scrollback replay; launchd and systemd install; GitHub Actions CI and release builds.
 
 **Out of scope:** everything in §4 Non-goals.
 
@@ -171,7 +171,7 @@ All events are JSON log lines on the host only; nothing leaves the host (A-013).
 
 ## 12. Data and integrations
 
-- **Stored:** a state file `~/.ccctl/state.json` (mode 0600, written atomically on every state change) holding, per slot: slot number, task name, working directory, worktree path, branch, Claude session UUID, state, launch time. Config file `~/.ccctl/config.toml` holding `roots` (default `["~/projects", "~/Documents"]`, A-020), `claude_path` (A-022), `tailscale_path` (A-021), `port` (default 7681), `allowed_logins` (default: the host node's own login), `max_sessions` fixed at 4, and `env` (variables added to every session; set write-only from the page's Settings panel, DL-018). Terminal output is held only in memory (1 MiB ring buffer per session) and never written to disk by the controller. Logs in `~/.ccctl/logs/`, rotated at 10 MB, 7 files kept (A-019). The only personal data is Tailscale login names in logs.
+- **Stored:** a state file `~/.ccctl/state.json` (mode 0600, written atomically on every state change) holding, per slot: slot number, task name, working directory, worktree path, branch, Claude session UUID, state, launch time. Config file `~/.ccctl/config.toml` holding `roots` (default `["~/projects", "~/Documents"]`, A-020), `claude_path` (A-022), `tailscale_path` (A-021), `port` (default 7681), `allowed_logins` (default: the host node's own login), `max_sessions` fixed at 6, and `env` (variables added to every session; set write-only from the page's Settings panel, DL-018). Terminal output is held only in memory (1 MiB ring buffer per session) and never written to disk by the controller. Logs in `~/.ccctl/logs/`, rotated at 10 MB, 7 files kept (A-019). The only personal data is Tailscale login names in logs.
 - **Migration:** none (first release).
 - **Integrations:**
   - **Tailscale (host daemon):** the CLI found by A-021, `status --json` every 10 seconds for `BackendState` and the Tailscale IPv4; WhoIs lookup of the caller's address for its login on each HTTP request and WebSocket upgrade (cached per remote address for 60 seconds). Authenticated by local socket access as the host user. Tests replace it with a Go interface fake.
@@ -181,9 +181,9 @@ All events are JSON log lines on the host only; nothing leaves the host (A-013).
 
 ## 13. Non-functional requirements
 
-- Controller-added output latency (PTY read to WebSocket write) p95 of 20 milliseconds or less with 4 busy sessions, measured by a Go benchmark on the host (A-011).
+- Controller-added output latency (PTY read to WebSocket write) p95 of 20 milliseconds or less with 6 busy sessions, measured by a Go benchmark on the host (A-011).
 - End-to-end output-to-render latency p95 of 250 milliseconds or less between two devices on the same tailnet, measured with a timestamped echo test in CI-independent manual QA.
-- Controller resident memory 150 MB or less with 4 sessions and full scrollback buffers, excluding the `claude` processes, measured with `ps` on the host.
+- Controller resident memory 150 MB or less with 6 sessions and full scrollback buffers, excluding the `claude` processes, measured with `ps` on the host.
 - Page first load 2 seconds or less over the tailnet on a desktop browser, measured by the browser performance timeline.
 - Binary size 30 MB or less per platform.
 - Restart after crash: serving again within 10 seconds under launchd or systemd.
@@ -230,7 +230,7 @@ All events are JSON log lines on the host only; nothing leaves the host (A-013).
 | DL-007 | constraints | How should the controller be reached over Tailscale? | A. Embedded tsnet node (recommended) B. Bind the host's 100.x IP C. localhost plus tailscale serve | Custom: Tailscale is already installed on both machines; make sure it is on and give an error message if it is not on. | §5, §7, A-005 |
 | DL-008 | inputs | Which permission mode should new Claude sessions launch in? | A. Pick per session (recommended) B. Always default C. Always bypass | C | §5, §7, §8 |
 | DL-009 | interface | Using the host's existing Tailscale, how should the controller serve the page? | A. HTTPS via tailscale cert (recommended) B. Plain HTTP on the 100.x IP | B | §4, §6, §7 |
-| DL-010 | states | Is four sessions a hard limit? | A. Hard cap of 4 (recommended) B. Configurable cap with 4 default C. 4 visible, more in background | A | §4, §5 |
+| DL-010 | states | Is four sessions a hard limit? | A. Hard cap of 4 (recommended) B. Configurable cap with 4 default C. 4 visible, more in background | A (superseded by DL-019: the hard cap is now 6) | §4, §5 |
 | DL-011 | inputs | When you start a session, how do you choose the repo it works in? | A. Pick from scanned roots (recommended) B. Free-text path C. Both | C | §5, §6 |
 | DL-012 | states | When a task's session ends, what happens to its git worktree? | A. Keep it (recommended) B. Remove if clean C. Remove button, never auto | A | §4, §5 |
 | DL-013 | states | After the controller or host restarts, how do the previous sessions come back? | A. Auto-resume in place (recommended) B. Resume button per pane | A | §5 |
@@ -239,6 +239,7 @@ All events are JSON log lines on the host only; nothing leaves the host (A-013).
 | DL-016 | states | With 3 sessions running and slot 4 holding an exited pane not yet closed, what should New session do? | A. Reuse the exited pane (recommended) B. Must close it first | A | §5 |
 | DL-017 | states | After a resume fails, what does Start fresh launch? | A. New session with a new UUID in the same slot, worktree, and branch (recommended) B. Open the launch form pre-filled | A | §5 |
 | DL-018 | integrations | Where should the owner set session environment variables such as CLAUDE_CODE_OAUTH_TOKEN and GEMINI_API_KEY? | A. Settings panel in the page (recommended) B. Config file only C. ccctl env command D. Per-session field | A: a write-only Settings panel storing `[env]` in `~/.ccctl/config.toml` (0600), applied to sessions launched afterwards; supersedes non-goal 11 in part | §4, §12 |
+| DL-019 | states | Can the owner run more than four sessions? | A. Raise the hard cap to 6 and let the grid grow with the number of open sessions | A: the cap is 6; the grid shows 1 pane, 2 side by side, 2x2 for 3 or 4, 3x2 for 5 or 6; supersedes DL-010 and the 2x2 grid | §4, §5, §6 |
 
 ## Coverage
 

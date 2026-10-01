@@ -1,10 +1,10 @@
 # ccctl: claude-code-controller
 
-**ccctl is a web controller for up to four live [Claude Code](https://docs.claude.com/en/docs/claude-code) sessions on one machine, reached privately over Tailscale.**
+**ccctl is a web controller for up to six live [Claude Code](https://docs.claude.com/en/docs/claude-code) sessions on one machine, reached privately over Tailscale.**
 
 > Unofficial community project. It is not affiliated with, endorsed by, or sponsored by Anthropic. "Claude" and "Claude Code" are trademarks of Anthropic.
 
-ccctl is built for developers who run several Claude Code sessions in parallel on an always-on Mac or Linux host. Open `http://TAILSCALE_IP:7681/` from any device on your tailnet and get a 2x2 grid of real `claude` terminals. The problem it solves: a session blocked on a prompt in a terminal you are not looking at. You watch all four, type into any of them, and see at a glance which one is waiting for you.
+ccctl is built for developers who run several Claude Code sessions in parallel on an always-on Mac or Linux host. Open `http://TAILSCALE_IP:7681/` from any device on your tailnet and get a grid of real `claude` terminals that grows from one pane to six as you start sessions. The problem it solves: a session blocked on a prompt in a terminal you are not looking at. You watch them all, type into any of them, and see at a glance which one is waiting for you.
 
 ## At a glance
 
@@ -13,7 +13,7 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 | **What it is** | One Go binary (`ccctl`) with an embedded Vue 3 + xterm.js web UI, run as a background service on the host that runs Claude Code. |
 | **Who it is for** | People who run several Claude Code sessions in parallel on a Mac or Linux box (a Mac mini, a home server) and want to check on them from a laptop or desktop browser (the page needs a window at least 1024 px wide; phone layouts are not supported). |
 | **Problem it solves** | Parallel agent sessions sit blocked on a prompt in a terminal you are not looking at. ccctl shows all of them in one page and flags the one that needs you: an amber pane header, a tab-title count, and an optional chime. |
-| **Outcome** | Start, watch, and answer up to four sessions from any device on your tailnet, with each task isolated in its own git worktree. |
+| **Outcome** | Start, watch, and answer up to six sessions from any device on your tailnet, with each task isolated in its own git worktree. |
 | **Status** | Early (`v0.1.x`). Used daily by its author. Expect rough edges and breaking changes. |
 | **Platforms** | Host: macOS or Linux, arm64 or amd64. Viewer: any modern browser on your tailnet. |
 | **License** | [MIT](LICENSE) |
@@ -26,7 +26,7 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 ### Do not use it when
 
 - You need to expose sessions to the public internet, other tailnets, or people you do not trust. Every session runs with `--dangerously-skip-permissions`, so anyone with access controls your machine. See [Security notes](#security-notes).
-- You need TLS, per-session permissions, or more than four sessions. None of these exist.
+- You need TLS, per-session permissions, or more than six sessions. None of these exist.
 - You want a hosted service or multi-user product. ccctl is a single-user tool.
 
 ## Compared with
@@ -38,7 +38,7 @@ All of these let you reach a Claude Code session from another device. ccctl's ni
 | Where sessions run | Your machine | Your machine | Your machine, or a hosted tier | Your machine |
 | Path to your sessions | Direct, over your tailnet | Through Anthropic's servers; the transcript is stored there | Direct (self-hosted) | Direct, over SSH |
 | Sign-in needed | Your Tailscale login | A claude.ai subscription (API keys are not supported) | None beyond the tool's own | SSH key |
-| Several sessions at a glance | 2x2 grid of live terminals | Session list in the app or claude.ai/code | Session list and tabs | Panes, if you set them up |
+| Several sessions at a glance | Grid of live terminals (1 to 6, resizes as you add) | Session list in the app or claude.ai/code | Session list and tabs | Panes, if you set them up |
 | "Needs input" signal | Amber pane header, tab count, chime | Mobile push notifications | Not documented | None |
 | Worktree per task | Yes, by default for git repos | Optional (`--spawn worktree`) | Not documented | Manual |
 | Cost | Free, MIT | Included with a Claude subscription | Free (AGPL); hosted tier is paid | Free |

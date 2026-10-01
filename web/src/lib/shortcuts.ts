@@ -1,11 +1,11 @@
 import { terminalBus } from './terminalBus';
 import { useSessions } from '../stores/sessions';
 
-/** Ctrl+Shift+1..4 focus pane, Ctrl+Shift+0 leave terminals, Ctrl+Shift+M maximize. Returns true if handled. */
+/** Ctrl+Shift+1..6 focus pane, Ctrl+Shift+0 leave terminals, Ctrl+Shift+M maximize. Returns true if handled. */
 export function handleShortcut(e: KeyboardEvent): boolean {
   if (!(e.ctrlKey && e.shiftKey)) return false;
   const store = useSessions();
-  const m = /^Digit([0-4])$/.exec(e.code);
+  const m = /^Digit([0-6])$/.exec(e.code);
   if (m) {
     const n = Number(m[1]);
     if (n === 0) {

@@ -108,8 +108,8 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
           @focusout="onFocusOut"
         >
           <dl>
-            <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>1</kbd>–<kbd>4</kbd></dt>
-            <dd>Type into pane 1–4</dd>
+            <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>1</kbd>–<kbd>6</kbd></dt>
+            <dd>Type into pane 1–6</dd>
             <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>0</kbd></dt>
             <dd>Leave the terminals (focus this header)</dd>
             <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>M</kbd></dt>

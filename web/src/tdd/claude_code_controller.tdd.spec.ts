@@ -174,16 +174,16 @@ describe('REQ-006 — The controller checks Tailscale every 10 seconds: when Tai
   });
 });
 
-describe('REQ-007 — At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited and resume-failed panes count as free and are replaced without touching their worktrees.', () => {
+describe('REQ-007 — At most 6 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited and resume-failed panes count as free and are replaced without touching their worktrees.', () => {
   it('SC-007-d New session control state', async () => {
     const store = useSessions();
-    store.slots = [info(1, 'running'), info(2, 'starting'), info(3, 'needs-input'), info(4, 'running')];
+    store.slots = [info(1, 'running'), info(2, 'starting'), info(3, 'needs-input'), info(4, 'running'), info(5, 'running'), info(6, 'running')];
     const w = mount(AppHeader);
     const btn = () => w.get('[data-testid="new-session"]').element as HTMLButtonElement;
     expect(btn().disabled).toBe(true);
-    expect(btn().title).toBe('All 4 slots are in use. Stop or close a session first.');
+    expect(btn().title).toBe('All 6 slots are in use. Stop or close a session first.');
 
-    store.slots = [info(1, 'running'), info(2, 'starting'), info(3, 'needs-input'), info(4, 'exited')];
+    store.slots = [info(1, 'running'), info(2, 'starting'), info(3, 'needs-input'), info(4, 'running'), info(5, 'running'), info(6, 'exited')];
     await w.vm.$nextTick();
     expect(btn().disabled).toBe(false);
     w.unmount();
