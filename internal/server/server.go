@@ -228,7 +228,9 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if strings.HasPrefix(p, "assets/") {
+	// The page has no client-side routes, so a missing path that looks like a file
+	// (robots.txt, sitemap.xml, a stale chunk) is a 404, not the page.
+	if strings.HasPrefix(p, "assets/") || path.Ext(p) != "" {
 		http.NotFound(w, r)
 		return
 	}

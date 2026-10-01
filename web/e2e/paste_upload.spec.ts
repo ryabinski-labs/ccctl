@@ -159,6 +159,48 @@ test.describe('Paste and upload into a session', () => {
   });
 });
 
+test.describe('Attach button and error banner', () => {
+  test('Keyboard focus stays on the attach button during an upload, and it shows a spinner', async ({ page, controller }) => {
+    await start(page, controller);
+    await page.route('**/api/sessions/1/upload*', async (r) => {
+      await new Promise((res) => setTimeout(res, 800));
+      await r.fulfill({ status: 201, contentType: 'application/json', body: '{"path":"/tmp/x.txt","size":1}' });
+    });
+    const attach = page.locator('[data-slot="1"] [data-testid="attach"]');
+    await attach.focus();
+    await page.locator('[data-slot="1"] [data-testid="attach-input"]').setInputFiles({ name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
+    await expect(attach).toHaveAttribute('aria-disabled', 'true');
+    await expect(attach.locator('.spinner')).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('attach');
+    await expect(attach).toHaveAttribute('aria-disabled', 'false');
+    await expect(attach.locator('.spinner')).toHaveCount(0);
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe('attach');
+  });
+
+  test('Pane icon buttons are at least 32 px square', async ({ page, controller }) => {
+    await start(page, controller);
+    for (const id of ['attach', 'maximize', 'stop']) {
+      const box = await page.locator(`[data-slot="1"] [data-testid="${id}"]`).boundingBox();
+      expect(box!.width, id).toBeGreaterThanOrEqual(32);
+      expect(box!.height, id).toBeGreaterThanOrEqual(32);
+    }
+  });
+
+  test('An upload error sits above the terminal without covering it, and can be dismissed', async ({ page, controller }) => {
+    await start(page, controller);
+    await page.route('**/api/sessions/1/upload*', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"disk on fire"}' }));
+    await page.locator('[data-slot="1"] [data-testid="attach-input"]').setInputFiles({ name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
+    const banner = page.locator('[data-slot="1"] .perror');
+    await expect(banner).toHaveText('disk on fire');
+    const b = (await banner.boundingBox())!;
+    const t = (await page.locator('[data-slot="1"] .xterm').boundingBox())!;
+    expect(t.y).toBeGreaterThanOrEqual(b.y + b.height - 1);
+    await expect.poll(() => paneText(page, 1), { timeout: 5000 }).toContain('FAKE_CLAUDE');
+    await banner.getByRole('button', { name: 'Dismiss' }).click();
+    await expect(banner).toHaveCount(0);
+  });
+});
+
 test.describe('Copy out of a session (OSC 52)', () => {
   test('A clipboard write from the session reaches the browser clipboard', async ({ page, controller, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);

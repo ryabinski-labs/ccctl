@@ -11,7 +11,7 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 | | |
 |---|---|
 | **What it is** | One Go binary (`ccctl`) with an embedded Vue 3 + xterm.js web UI, run as a background service on the host that runs Claude Code. |
-| **Who it is for** | People who run several Claude Code sessions in parallel on a Mac or Linux box (a Mac mini, a home server) and want to check on them from a laptop, tablet, or phone. |
+| **Who it is for** | People who run several Claude Code sessions in parallel on a Mac or Linux box (a Mac mini, a home server) and want to check on them from a laptop or desktop browser (the page needs a window at least 1024 px wide; phone layouts are not supported). |
 | **Problem it solves** | Parallel agent sessions sit blocked on a prompt in a terminal you are not looking at. ccctl shows all of them in one page and flags the one that needs you: an amber pane header, a tab-title count, and an optional chime. |
 | **Outcome** | Start, watch, and answer up to four sessions from any device on your tailnet, with each task isolated in its own git worktree. |
 | **Status** | Early (`v0.1.x`). Used daily by its author. Expect rough edges and breaking changes. |

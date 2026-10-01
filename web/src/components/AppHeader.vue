@@ -63,7 +63,7 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
   <header class="header">
     <div class="brand">
       <span class="mark" aria-hidden="true"><i /><i /><i /><i /></span>
-      <span class="word mono">ccctl</span>
+      <h1 class="word mono">ccctl</h1>
       <span class="sep" aria-hidden="true">/</span>
       <span class="host mono" data-testid="host">{{ store.host }}</span>
       <span
@@ -193,6 +193,7 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
   background: var(--wait-rule);
 }
 .word {
+  margin: 0;
   font-weight: 600;
   font-size: 15px;
   letter-spacing: -0.01em;
