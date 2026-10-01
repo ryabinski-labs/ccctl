@@ -135,7 +135,7 @@ func launchN(h *tu.H, n int) []string {
 }
 
 // SC-007-b: with every slot active (config.MaxSessions), one more launch is refused.
-func TestSc007BFifthActiveLaunchIsRefused(t *testing.T) {
+func TestSc007BLaunchBeyondTheCapIsRefused(t *testing.T) {
 	h := tu.Start(t, tu.Opts{})
 	max := config.MaxSessions
 	launchN(h, max)
