@@ -7,6 +7,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { terminalBus, type TerminalSink } from '../lib/terminalBus';
 import { useSessions } from '../stores/sessions';
+import { copyText, parseOsc52 } from '../lib/clipboard';
 
 const props = defineProps<{ slot: number }>();
 const emit = defineEmits<{ focus: []; blur: []; shortcut: [e: KeyboardEvent] }>();
@@ -94,6 +95,7 @@ onMounted(async () => {
     scrollback: 5000,
     screenReaderMode: store.srMode,
     macOptionIsMeta: false,
+    macOptionClickForcesSelection: true,
     theme: THEME,
   });
   fit = new FitAddon();
@@ -118,6 +120,27 @@ onMounted(async () => {
     }
     return true;
   });
+  // Claude Code copies its selections with OSC 52. If the browser refuses the
+  // write (it wants a user gesture), retry on the next click or keypress.
+  let pendingCopy: string | null = null;
+  term.parser.registerOscHandler(52, (data) => {
+    const text = parseOsc52(data);
+    if (text === null) return true;
+    void copyText(text).then((ok) => {
+      pendingCopy = ok ? null : text;
+    });
+    return true;
+  });
+  const flushCopy = () => {
+    const text = pendingCopy;
+    if (text === null) return;
+    pendingCopy = null;
+    void copyText(text).then((ok) => {
+      if (!ok) pendingCopy = text;
+    });
+  };
+  host.value.addEventListener('pointerup', flushCopy);
+  host.value.addEventListener('keydown', flushCopy);
   term.onData((d) => store.sendInput(props.slot, encoder.encode(d)));
   term.onBinary((d) => {
     const bytes = new Uint8Array(d.length);
