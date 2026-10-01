@@ -31,13 +31,14 @@ const (
 )
 
 type Server struct {
-	M      *session.Manager
-	Guard  *auth.Guard
-	Home   string
-	Roots  func() []string
-	Host   func() string
-	Static fs.FS // may be nil
-	Log    *slog.Logger
+	M     *session.Manager
+	Guard *auth.Guard
+	Home  string
+	// ScanTimeout stops a repo scan (default 10 s).
+	ScanTimeout time.Duration
+	Host        func() string
+	Static      fs.FS // may be nil
+	Log         *slog.Logger
 	// Version is the ccctl build, sent in hello so stale pages can offer a reload.
 	Version string
 
@@ -51,6 +52,7 @@ var Routes = []struct{ Method, Path string }{
 	{"POST", "/api/sessions"}, {"POST", "/api/sessions/1/stop"}, {"POST", "/api/sessions/1/fresh"},
 	{"POST", "/api/sessions/1/close"}, {"POST", "/api/sessions/1/upload"}, {"GET", "/ws"},
 	{"GET", "/api/settings/env"}, {"PUT", "/api/settings/env/X"}, {"DELETE", "/api/settings/env/X"},
+	{"GET", "/api/settings/repo-prefix"}, {"PUT", "/api/settings/repo-prefix"}, {"DELETE", "/api/settings/repo-prefix"},
 }
 
 func (s *Server) Handler() http.Handler {
@@ -65,6 +67,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings/env", s.envList)
 	mux.HandleFunc("PUT /api/settings/env/{name}", s.envSet)
 	mux.HandleFunc("DELETE /api/settings/env/{name}", s.envSet)
+	mux.HandleFunc("GET /api/settings/repo-prefix", s.prefixGet)
+	mux.HandleFunc("PUT /api/settings/repo-prefix", s.prefixSet)
+	mux.HandleFunc("DELETE /api/settings/repo-prefix", s.prefixSet)
 	mux.HandleFunc("GET /", s.static)
 	return s.Guard.Wrap(mux)
 }
@@ -105,12 +110,80 @@ func (s *Server) hello(r *http.Request) hello {
 
 func (s *Server) state(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.hello(r)) }
 
+// DefaultScanTimeout is how long a repo scan may run before it is stopped.
+const DefaultScanTimeout = 10 * time.Second
+
+// ScanTimeoutMsg is the 504 body and the text the launch list shows for it.
+const ScanTimeoutMsg = "Scanning took too long. On a Mac, allow ccctl to access this folder in the prompt on the host, then retry."
+
+// repos lists git repos under the saved repo_prefix. With no prefix it reads no folder.
 func (s *Server) repos(w http.ResponseWriter, r *http.Request) {
-	list := repos.Scan(s.Home, s.Roots())
-	if list == nil {
-		list = []repos.Repo{}
+	prefix, err := config.RepoPrefix(s.Home)
+	if err != nil {
+		writeErr(w, err)
+		return
 	}
-	writeJSON(w, 200, map[string]any{"repos": list})
+	limit := s.ScanTimeout
+	if limit <= 0 {
+		limit = DefaultScanTimeout
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), limit)
+	defer cancel()
+	start := time.Now()
+	res, err := repos.ScanPrefix(ctx, s.Home, prefix)
+	if prefix != "" {
+		s.Log.Info("repos_scan", "event", "repos_scan", "duration_ms", time.Since(start).Milliseconds(),
+			"count", len(res.Repos), "timed_out", errors.Is(err, context.DeadlineExceeded))
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		writeJSON(w, http.StatusGatewayTimeout, map[string]string{"error": ScanTimeoutMsg})
+		return
+	}
+	if err != nil {
+		return // the caller went away
+	}
+	writeJSON(w, 200, struct {
+		Repos   []repos.Repo `json:"repos"`
+		Prefix  string       `json:"prefix"`
+		Missing bool         `json:"missing,omitempty"`
+	}{res.Repos, prefix, res.Missing})
+}
+
+func (s *Server) prefixGet(w http.ResponseWriter, r *http.Request) {
+	prefix, err := config.RepoPrefix(s.Home)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]string{"prefix": prefix})
+}
+
+// prefixSet saves (PUT {"prefix"}) or clears (DELETE) the repo folder. It needs
+// the page's own Origin, as the other settings writes do.
+func (s *Server) prefixSet(w http.ResponseWriter, r *http.Request) {
+	if !auth.OriginOK(r) {
+		http.Error(w, "Cross-origin request refused.", http.StatusForbidden)
+		return
+	}
+	var value *string
+	if r.Method == http.MethodPut {
+		var body struct{ Prefix *string }
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&body); err != nil || body.Prefix == nil {
+			writeJSON(w, 400, map[string]string{"error": "Enter a folder path."})
+			return
+		}
+		value = body.Prefix
+	}
+	if err := config.SetRepoPrefix(s.Home, value); err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	action := "set"
+	if value == nil {
+		action = "cleared"
+	}
+	s.Log.Info("settings_repo_prefix_changed", "event", "settings_repo_prefix_changed", "action", action, "login", auth.LoginFrom(r.Context()))
+	s.prefixGet(w, r)
 }
 
 func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {

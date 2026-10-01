@@ -1,4 +1,5 @@
-import type { Inspection, LaunchRequest, Repo, SlotInfo } from './types';
+import type { Inspection, LaunchRequest, SlotInfo } from './types';
+import type { ReposResponse } from './repoList';
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -43,7 +44,11 @@ async function upload(slot: number, file: File): Promise<string> {
 
 export const api = {
   upload,
-  repos: () => call<{ repos: Repo[] }>('GET', '/api/repos').then((r) => r.repos ?? []),
+  repos: () => call<ReposResponse>('GET', '/api/repos').then((r) => ({ ...r, repos: r.repos ?? [] })),
+  /** The one folder New session scans for repos; empty when unset. */
+  repoPrefix: () => call<{ prefix: string }>('GET', '/api/settings/repo-prefix').then((r) => r.prefix),
+  repoPrefixSet: (prefix: string) => call<{ prefix: string }>('PUT', '/api/settings/repo-prefix', { prefix }).then((r) => r.prefix),
+  repoPrefixClear: () => call<{ prefix: string }>('DELETE', '/api/settings/repo-prefix').then((r) => r.prefix),
   inspect: (path: string) => call<Inspection>('GET', `/api/inspect?path=${encodeURIComponent(path)}`),
   launch: (req: LaunchRequest) => call<{ slot: number; info: SlotInfo }>('POST', '/api/sessions', req),
   stop: (slot: number) => call<object>('POST', `/api/sessions/${slot}/stop`),

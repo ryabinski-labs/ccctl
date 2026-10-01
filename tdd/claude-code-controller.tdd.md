@@ -9,10 +9,10 @@
 
 | Level | Scenarios | red | green | blocked | obsolete |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| unit | 27 | 0 | 27 | 0 | 0 |
-| integration | 33 | 0 | 33 | 0 | 0 |
+| unit | 27 | 0 | 26 | 0 | 1 |
+| integration | 33 | 0 | 32 | 0 | 1 |
 | acceptance | 10 | 5 | 5 | 0 | 0 |
-| **total** | **70** | 5 | 65 | 0 | 0 |
+| **total** | **70** | 5 | 63 | 0 | 2 |
 
 ## Non-goals
 
@@ -143,27 +143,27 @@
 - **Test doubles:** mocked inspection API response
 - **Test:** `web/src/tdd/claude_code_controller.tdd.spec.ts::SC-002-g`
 
-### REQ-003 — The launch form lists git repos found up to 3 folder levels under each existing root (default ~/projects and ~/Documents) plus direct children of home, and also accepts a custom path.
+### REQ-003 — The launch form lists git repos from the one folder saved in Settings and also accepts a custom path. Superseded for scanning by tdd/repo-prefix.tdd.yaml (the roots scan was removed, DL-002 in docs/prd/repo-prefix.md).
 
 **Priority:** P0 · **Type:** functional · **PRD:** §6 launch form; DL-011; A-020
 
-#### SC-003-a — Repo scan depth and missing roots  `integration` `green`
+#### SC-003-a — Repo scan depth and missing roots  `integration` `obsolete`
 
 - **Given** a temp HOME with no projects folder, Documents/a (depth 1), Documents/x/y/b (depth 3), Documents/x/y/z/c (depth 4), and HOME/d, each with .git
 - **When** the repo scanner runs with default roots
 - **Then** repos at depth 3 or less and home children are listed, depth 4 is not, and the missing root is skipped
 - **Oracle:** result set == {Documents/a, Documents/x/y/b, HOME/d} AND scanner returned no error
 - **Test doubles:** real filesystem temp HOME
-- **Test:** `internal/tdd/unit_test.go::SC-003-a`
+- **Test:** _not scaffolded_
 
-#### SC-003-b — Repo scan skips linked worktrees  `unit` `green`
+#### SC-003-b — Repo scan skips linked worktrees  `unit` `obsolete`
 
 - **Given** Documents/folio (a repo) and Documents/folio-wt-fix-login (a linked worktree with a .git file)
 - **When** the repo scanner runs
 - **Then** only the repo is listed
 - **Oracle:** result == [folio]
 - **Test doubles:** real filesystem temp HOME
-- **Test:** `internal/tdd/unit_test.go::SC-003-b`
+- **Test:** _not scaffolded_
 
 ### REQ-004 — The owner sees every session's live output in its own pane and keystrokes typed in a pane reach only that session's PTY; a maximized pane resizes its PTY.
 

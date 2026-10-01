@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, ApiError } from '../lib/api';
+import { filterRepos, repoListState, type ReposResponse } from '../lib/repoList';
 import { TEXT, type Inspection, type Repo } from '../lib/types';
 import { useSessions } from '../stores/sessions';
 import AppIcon from './AppIcon.vue';
@@ -17,6 +18,8 @@ const task = ref('');
 const taskTouched = ref(false);
 const repos = ref<Repo[]>([]);
 const reposLoading = ref(true);
+const reposResp = ref<ReposResponse | null>(null);
+const scanError = ref<{ status: number } | null>(null);
 const query = ref('');
 const selected = ref<string>('');
 const useCustom = ref(false);
@@ -35,11 +38,10 @@ const errorBox = ref<HTMLElement | null>(null);
 const folderPath = computed(() => (useCustom.value ? customPath.value.trim() : selected.value));
 const worktreeAllowed = computed(() => inspection.value?.worktree_allowed !== false);
 
-const filtered = computed(() => {
-  const q = query.value.trim().toLowerCase();
-  if (!q) return repos.value;
-  return repos.value.filter((r) => r.display.toLowerCase().includes(q) || r.name.toLowerCase().includes(q));
-});
+const listState = computed(() =>
+  repoListState({ loading: reposLoading.value, error: scanError.value, resp: reposResp.value }),
+);
+const filtered = computed(() => filterRepos(repos.value, query.value));
 
 const openTasks = computed(() =>
   store.slots.filter((s) => s && ['starting', 'running', 'needs-input'].includes(s.state)).map((s) => s!.task),
@@ -165,14 +167,28 @@ async function submit() {
   }
 }
 
-onMounted(async () => {
+async function loadRepos() {
+  reposLoading.value = true;
+  scanError.value = null;
   try {
-    repos.value = await api.repos();
-  } catch {
+    reposResp.value = await api.repos();
+    repos.value = reposResp.value.repos;
+  } catch (e) {
+    reposResp.value = null;
     repos.value = [];
+    scanError.value = { status: e instanceof ApiError ? e.status : 0 };
   } finally {
     reposLoading.value = false;
   }
+}
+
+function openSettings() {
+  emit('close');
+  store.settingsOpen = true;
+}
+
+onMounted(async () => {
+  await loadRepos();
   let last = '';
   try {
     last = localStorage.getItem(LAST_KEY) ?? '';
@@ -230,8 +246,21 @@ onMounted(async () => {
               @keydown="onListKey"
             />
           </div>
-          <ul id="repo-list" class="repos" role="listbox" aria-label="Repositories">
-            <li v-if="reposLoading" class="repos-empty">Scanning folders…</li>
+          <ul
+            id="repo-list"
+            class="repos"
+            :role="listState.kind === 'list' ? 'listbox' : undefined"
+            aria-label="Repositories"
+            :aria-live="listState.kind === 'list' ? undefined : 'polite'"
+          >
+            <li v-if="listState.kind === 'loading'" class="repos-empty">{{ listState.message }}</li>
+            <li v-else-if="listState.kind !== 'list'" class="repos-empty" data-testid="repo-state">
+              <span>{{ listState.message }}</span>
+              <button v-if="listState.kind === 'unset'" type="button" class="btn btn--sm" @click="openSettings">Open Settings</button>
+              <button v-else-if="listState.kind === 'timeout' || listState.kind === 'error'" type="button" class="btn btn--sm" @click="loadRepos">
+                Retry
+              </button>
+            </li>
             <li v-else-if="!filtered.length" class="repos-empty">No repositories match. Use a custom path instead.</li>
             <li
               v-for="(r, i) in filtered"
@@ -266,7 +295,7 @@ onMounted(async () => {
             spellcheck="false"
           />
           <p v-if="pathError" id="launch-path-error" class="hint hint--err" role="alert" data-testid="path-error">{{ pathError }}</p>
-          <button type="button" class="linkish" @click="useCustom = false">Pick from scanned repositories</button>
+          <button type="button" class="linkish" @click="useCustom = false">Back to the repository list</button>
         </template>
       </fieldset>
 
@@ -455,6 +484,10 @@ legend {
   white-space: nowrap;
 }
 .repos-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   padding: 10px 8px;
   color: var(--muted);
   font-size: 13px;

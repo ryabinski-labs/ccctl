@@ -1,0 +1,391 @@
+schema: tdd-artifact/v1
+feature: repo-prefix
+title: Repository folder prefix in Settings
+source:
+  prd: docs/prd/repo-prefix.md
+  prd_sha256: d60c68de965b288f4653f6dec26514c75c84555b327c0540ee24bfc01d400330
+defaults:
+  priority: P2
+non_goals:
+- More than one repository folder (DL-001)
+- Filtering by repo-name prefix (DL-001)
+- Restricting custom paths to the prefix (A-002)
+- A folder picker or browse dialog
+- Streaming partial scan results (DL-005)
+- Migrating old roots values (DL-002)
+open_questions: []
+requirements:
+- id: REQ-pfx-set
+  text: The owner can set, change and clear one repository folder in Settings, an invalid folder is refused with a message
+    and nothing is written, and the launch list shows only repos under the saved folder.
+  priority: P0
+  type: functional
+  prd_ref: §5 story 1; DL-001; DL-003; A-001; A-004
+  scenarios:
+  - id: SC-pfx-set-a
+    level: unit
+    title: Saving and clearing the prefix edits one config key
+    given: a temp HOME with a config.toml holding port 7700 and an [env] entry, and an existing folder ~/projects
+    when: the prefix is saved as ~/projects and then cleared
+    then: repo_prefix is stored as typed, every other key is untouched, and clearing removes only repo_prefix
+    oracle: after save, config.Load(home).RepoPrefix == '~/projects' AND Port == 7700 AND Env unchanged; after clear, the file has no repo_prefix
+      key AND Port == 7700 AND Env unchanged
+    doubles: real files in a temp directory
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-set-a
+    status: green
+  - id: SC-pfx-set-b
+    level: unit
+    title: A prefix that is not an existing absolute folder is refused
+    given: a temp HOME with a saved prefix ~/projects, an existing file ~/notes.txt, and no folder /no/such/folder
+    when: saving /no/such/folder, ~/notes.txt, and a relative path src
+    then: each save fails with the folder message naming what was typed and config.toml is byte-identical to before
+    oracle: error text == 'Folder /no/such/folder does not exist or is not a folder.' for the first, the same pattern with the typed
+      text for the others, AND the config.toml bytes are unchanged after every attempt
+    doubles: real files in a temp directory
+    negative: true
+    data:
+      typed:
+      - /no/such/folder
+      - ~/notes.txt
+      - src
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-set-b
+    status: green
+  - id: SC-pfx-set-c
+    level: integration
+    title: Setting the prefix over HTTP limits the launch list to repos under it
+    given: a running controller whose HOME holds repos projects/a, projects/b/c and other/d, no prefix set, and the owner's login
+    when: the owner PUTs /api/settings/repo-prefix with {"prefix":"~/projects"} from the page's Origin and then GETs /api/repos
+    then: the PUT returns the stored prefix and the repo list names a and b/c only, with no controller restart
+    oracle: PUT returns 200 {"prefix":"~/projects"}; GET /api/settings/repo-prefix returns the same; GET /api/repos returns
+      200 whose repos[].path set == {HOME/projects/a, HOME/projects/b/c} and prefix == '~/projects'
+    doubles: real controller with fake Tailscale and fake claude; real git folders in a temp directory
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-set-c
+    status: green
+  - id: SC-pfx-set-e
+    level: integration
+    title: Clearing the prefix over HTTP returns the list to the unset state
+    given: a running controller with prefix ~/projects saved and two repos under it
+    when: the owner sends DELETE /api/settings/repo-prefix from the page's Origin and then GETs /api/repos
+    then: the key is gone from config.toml and the list is empty with an empty prefix
+    oracle: DELETE returns 200 {"prefix":""}; config.toml has no repo_prefix; GET /api/repos returns {"repos":[],"prefix":""}
+    doubles: real controller with fake Tailscale and fake claude
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-set-e
+    status: green
+  - id: SC-pfx-set-f
+    level: acceptance
+    title: Saving a folder in Settings narrows the New session list
+    given: the page is open on a controller whose HOME holds Documents/repo1..repo3 and other/outside, with no prefix set
+    when: the owner opens Settings, enters ~/Documents, presses Save, closes Settings, and opens New session
+    then: the confirmation appears and the list shows repo1..repo3 and not outside
+    oracle: status text 'Repository folder saved. It applies the next time you open New session.' is visible after Save; the
+      launch list option set has data-path ending repo1, repo2, repo3 and none ending outside
+    doubles: real controller with fake Tailscale and fake claude
+    tags:
+    - playwright
+    test_ref: web/e2e/repo_prefix.spec.ts::SC-pfx-set-f
+    status: green
+  - id: SC-pfx-set-g
+    level: acceptance
+    title: Settings shows the folder error under the field
+    given: the page is open with Settings showing the Repository folder field
+    when: the owner enters /no/such/folder and presses Save
+    then: the error appears under the field and the previously saved prefix still drives the list
+    oracle: an element with role alert under the field has text 'Folder /no/such/folder does not exist or is not a folder.'; config.toml
+      repo_prefix is unchanged
+    doubles: real controller with fake Tailscale and fake claude
+    negative: true
+    tags:
+    - playwright
+    test_ref: web/e2e/repo_prefix.spec.ts::SC-pfx-set-g
+    status: green
+- id: REQ-pfx-auth
+  text: Reading or changing the repository folder is limited to allowlisted logins, and writes also need the page's own Origin.
+  priority: P0
+  type: non-functional
+  prd_ref: §5 story 1 error 2; §13 Security; A-005
+  scenarios:
+  - id: SC-pfx-auth-a
+    level: integration
+    title: A login outside the allowlist is refused on the repo folder routes
+    given: a running controller allowing only the owner login and a caller whose Tailscale login is not on the list
+    when: the caller sends GET, PUT and DELETE to /api/settings/repo-prefix
+    then: each gets HTTP 403 and config.toml is unchanged
+    oracle: three responses with status 403; config.toml bytes unchanged; the Routes table in the server lists all three method and path pairs
+    doubles: real controller with fake Tailscale WhoIs
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-auth-a
+    status: green
+  - id: SC-pfx-auth-b
+    level: integration
+    title: A cross-origin write to the repo folder is refused
+    given: a running controller and the owner's login
+    when: PUT and DELETE /api/settings/repo-prefix arrive with Origin http://evil.example
+    then: both get HTTP 403 and config.toml is unchanged
+    oracle: status 403 with body 'Cross-origin request refused.' for both; config.toml bytes unchanged
+    doubles: real controller with fake Tailscale
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-auth-b
+    status: green
+- id: REQ-pfx-noscan
+  text: With no prefix set, no folder is read for the repo list, old roots entries and the home folder's children are ignored,
+    and the launch list says no folder is set and offers Settings.
+  priority: P0
+  type: functional
+  prd_ref: §5 story 2; DL-002; DL-004; §13 unset prefix
+  scenarios:
+  - id: SC-pfx-noscan-a
+    level: unit
+    title: The scanner reads nothing when the prefix is empty
+    given: a temp HOME with git repos in ~/projects, ~/Documents and ~/direct, and a counting ReadDir double
+    when: the scanner runs with an empty prefix
+    then: it returns no repos and the double counts 0 directory reads
+    oracle: result.Repos is empty AND readDirCalls == 0
+    doubles: counting ReadDir hook; real folders
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-noscan-a
+    status: green
+  - id: SC-pfx-noscan-b
+    level: integration
+    title: Old roots and home children are ignored over HTTP
+    given: a running controller whose config.toml holds roots = [HOME/Documents] and no repo_prefix, with git repos in Documents
+      and directly under HOME
+    when: the owner GETs /api/repos
+    then: the response is the empty unset response and no directory was read
+    oracle: 200 {"repos":[],"prefix":""} AND the counting ReadDir hook reports 0 calls
+    doubles: real controller; counting ReadDir hook
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-noscan-b
+    status: green
+  - id: SC-pfx-noscan-c
+    level: acceptance
+    title: The unset message offers Settings and keeps the custom path
+    given: the page is open on a controller with no prefix set
+    when: the owner opens New session, then presses Open Settings
+    then: the list area says no folder is set, the custom path link is present, and Settings opens with focus in the folder field
+    oracle: list area text 'No repository folder is set.'; the 'Use a custom path' link is visible; after the press the Settings
+      dialog is visible and document.activeElement has id repo-prefix
+    doubles: real controller with fake Tailscale and fake claude
+    tags:
+    - playwright
+    test_ref: web/e2e/repo_prefix.spec.ts::SC-pfx-noscan-c
+    status: green
+  - id: SC-pfx-noscan-d
+    level: unit
+    title: The list state is unset when the server reports an empty prefix
+    given: a repos response {"repos":[],"prefix":""} and no error
+    when: the list state is derived
+    then: the state is unset with the no-folder message
+    oracle: repoListState(...) == {kind:'unset', message:'No repository folder is set.'}
+    doubles: none; pure function
+    tags:
+    - vitest
+    test_ref: web/src/tdd/repo_prefix.tdd.spec.ts::SC-pfx-noscan-d
+    status: green
+- id: REQ-pfx-timeout
+  text: A repo scan that has not finished after 10 seconds is stopped with HTTP 504, and the launch list explains it and offers
+    Retry instead of waiting without end.
+  priority: P0
+  type: functional
+  prd_ref: §5 story 3; DL-005; §13 scan stop
+  scenarios:
+  - id: SC-pfx-timeout-a
+    level: unit
+    title: The scanner gives up when its context expires
+    given: a ReadDir double that blocks until released and a context with a 50 ms deadline
+    when: the scanner runs under the prefix
+    then: it returns the deadline error within 500 ms and the blocked read, once released, ends without a panic
+    oracle: err is context.DeadlineExceeded AND elapsed < 500 ms; after release the goroutine ends within 1 s
+    doubles: blocking ReadDir hook; real folders
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-timeout-a
+    status: green
+  - id: SC-pfx-timeout-b
+    level: integration
+    title: A slow scan returns 504 with the explanation and is logged
+    given: a running controller with prefix ~/projects, a scan timeout of 100 ms, and a ReadDir double that blocks
+    when: the owner GETs /api/repos
+    then: the response is 504 with the explanation, and a repos_scan log line records the timeout
+    oracle: status 504 AND body error == 'Scanning took too long. On a Mac, allow ccctl to access this folder in the prompt on
+      the host, then retry.' AND a log event repos_scan with timed_out true and duration_ms >= 100
+    doubles: real controller; blocking ReadDir hook; configurable scan timeout
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-timeout-b
+    status: green
+  - id: SC-pfx-timeout-c
+    level: unit
+    title: A 504 maps to the timeout state and loading maps to Scanning
+    given: a repos call that failed with status 504, and a call still in flight
+    when: the list state is derived for each
+    then: the first is the timeout state with the full message and the second is the loading state
+    oracle: kind 'timeout' with message 'Scanning took too long. On a Mac, allow ccctl to access this folder in the prompt on the
+      host, then retry.'; kind 'loading' with message 'Scanning folders…'
+    doubles: none; pure function
+    negative: true
+    tags:
+    - vitest
+    test_ref: web/src/tdd/repo_prefix.tdd.spec.ts::SC-pfx-timeout-c
+    status: green
+  - id: SC-pfx-timeout-d
+    level: acceptance
+    title: Retry after a timed-out scan lists the repos
+    given: the page is open on a controller with prefix ~/Documents, a 300 ms scan timeout, and the first scan blocked
+    when: the owner opens New session, sees the timeout message, and presses Retry
+    then: the dialog shows Scanning folders and then lists the repos from the second scan
+    oracle: text 'Scanning took too long. On a Mac, allow ccctl to access this folder in the prompt on the host, then retry.'
+      is visible with a Retry button; after Retry exactly one more GET /api/repos is sent and the list shows repo1
+    doubles: real controller; blocking ReadDir hook for the first scan
+    tags:
+    - playwright
+    test_ref: web/e2e/repo_prefix.spec.ts::SC-pfx-timeout-d
+    status: green
+- id: REQ-pfx-empty
+  text: When the saved folder holds no repos, or no longer exists, the launch list says which, without logging a failure.
+  priority: P0
+  type: functional
+  prd_ref: §5 story 4; A-003
+  scenarios:
+  - id: SC-pfx-empty-a
+    level: integration
+    title: Empty and deleted prefix folders give distinct responses
+    given: a running controller with prefix ~/empty (an existing folder with no repos), then ~/empty deleted
+    when: the owner GETs /api/repos before and after the folder is deleted
+    then: the first response is an empty list, the second adds missing true, and neither is logged as an error
+    oracle: first 200 {"repos":[],"prefix":"~/empty"}; second 200 {"repos":[],"prefix":"~/empty","missing":true}; no log line at level WARN or ERROR
+    doubles: real controller; real folders
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-empty-a
+    status: green
+  - id: SC-pfx-empty-b
+    level: unit
+    title: The list state words the empty and missing cases
+    given: responses for prefix ~/Documents/projects that are empty, and empty with missing true
+    when: the list state is derived for each
+    then: the empty case names the folder and offers a custom path or Settings, and the missing case says the folder was not found
+    oracle: kind 'empty' with message 'No repositories found under ~/Documents/projects. Use a custom path or change the folder in Settings.';
+      kind 'missing' with message 'The repository folder ~/Documents/projects was not found. Change it in Settings.'
+    doubles: none; pure function
+    tags:
+    - vitest
+    test_ref: web/src/tdd/repo_prefix.tdd.spec.ts::SC-pfx-empty-b
+    status: green
+  - id: SC-pfx-empty-c
+    level: acceptance
+    title: The launch dialog shows the empty and missing messages
+    given: the page is open on a controller with prefix ~/empty, an existing folder with no repos
+    when: the owner opens New session, then the folder is deleted and New session is opened again
+    then: the first message says no repos were found under ~/empty and the second says the folder was not found
+    oracle: list area text 'No repositories found under ~/empty. Use a custom path or change the folder in Settings.' then 'The
+      repository folder ~/empty was not found. Change it in Settings.'
+    doubles: real controller with fake Tailscale and fake claude
+    tags:
+    - playwright
+    test_ref: web/e2e/repo_prefix.spec.ts::SC-pfx-empty-c
+    status: green
+- id: REQ-pfx-scan
+  text: Under the prefix the scanner lists git repos within 3 folder levels, does not descend into repos, does not list linked
+    worktrees, and lists the prefix itself when it is a repo.
+  priority: P1
+  type: functional
+  prd_ref: §5 terms; A-008; A-009
+  scenarios:
+  - id: SC-pfx-scan-a
+    level: unit
+    title: Scan depth and entry rules under the prefix
+    given: a temp prefix P with repo P/a (level 1), P/x/y/b (level 3), P/x/y/z/c (level 4), a repo P/a/inner nested in repo P/a,
+      and a linked worktree folder P/wt whose .git is a file
+    when: the scanner runs on P, and on a prefix that is itself a repo
+    then: only a and x/y/b are listed for P, and the prefix is the single entry when it is a repo
+    oracle: path set == {P/a, P/x/y/b} for P; path set == {P} when P/.git is a folder
+    doubles: real folders in a temp directory
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-scan-a
+    status: green
+- id: REQ-pfx-search
+  text: The Search repositories box narrows the filtered list by name or display path.
+  priority: P1
+  type: functional
+  prd_ref: §5 story 5
+  scenarios:
+  - id: SC-pfx-search-a
+    level: unit
+    title: Filtering a 12-repo list
+    given: 12 repos where 3 have fol in the name or the display path
+    when: the query fol is applied, in upper and lower case, and an empty query
+    then: only the 3 match for fol, and all 12 stay for an empty query
+    oracle: filterRepos(repos,'fol').length == 3 AND filterRepos(repos,'FOL').length == 3 AND filterRepos(repos,'  ').length == 12
+    doubles: none; pure function
+    tags:
+    - vitest
+    test_ref: web/src/tdd/repo_prefix.tdd.spec.ts::SC-pfx-search-a
+    status: green
+- id: REQ-pfx-docs
+  text: The README configuration table documents repo_prefix, its 3-level depth, the unset default, and that roots is ignored.
+  priority: P2
+  type: constraint
+  prd_ref: §5 story 6
+  scenarios:
+  - id: SC-pfx-docs-a
+    level: integration
+    title: README documents repo_prefix
+    given: the README.md in the repository
+    when: its configuration table is read
+    then: a repo_prefix row states unset by default and no scan, 3 levels deep, and that roots is ignored, and no row still lists roots as a scan setting
+    oracle: a table row matches /\| `repo_prefix` \|/ and mentions 'unset', '3 levels' and 'roots'; no row starts with | `roots` | as an active key
+    doubles: none; reads the file
+    tags:
+    - go
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-docs-a
+    status: green
+- id: REQ-pfx-nfr
+  text: Saving the prefix keeps config.toml at mode 0600 with every other key, and a scan of 50 repos answers with p95 under 1000 ms.
+  priority: P1
+  type: non-functional
+  prd_ref: §13 config write; §13 scan time
+  scenarios:
+  - id: SC-pfx-nfr-a
+    level: unit
+    title: 100 saves keep the mode and the other keys
+    given: a config.toml at mode 0600 holding port, allowed_logins and an [env] entry
+    when: the prefix is saved and cleared 100 times alternately
+    then: every write leaves mode 0600 and the other keys intact
+    oracle: after each of 100 writes, stat mode == 0600 AND port, allowed_logins and env equal the originals
+    doubles: real files in a temp directory
+    tags:
+    - go
+    - nfr
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-nfr-a
+    status: green
+  - id: SC-pfx-nfr-b
+    level: integration
+    title: Scanning 50 repos is answered in under 1000 ms at p95
+    given: a prefix holding 50 git repos spread within 3 levels
+    when: the scanner runs 20 times
+    then: the 95th percentile duration is under 1000 ms
+    oracle: sorted durations[18] < 1000 ms
+    doubles: real folders in a temp directory
+    tags:
+    - go
+    - nfr
+    test_ref: internal/tdd/repoprefix_test.go::SC-pfx-nfr-b
+    status: green

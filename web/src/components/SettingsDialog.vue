@@ -18,6 +18,14 @@ const saved = ref('');
 const confirmRemove = ref('');
 const valueInput = ref<HTMLInputElement | null>(null);
 
+// The one folder New session scans for repos. Empty means no scan.
+const prefix = ref('');
+const savedPrefix = ref('');
+const prefixSaving = ref(false);
+const prefixError = ref('');
+const prefixSaved = ref('');
+const prefixDirty = computed(() => prefix.value.trim() !== savedPrefix.value);
+
 const SUGGESTED = ['CLAUDE_CODE_OAUTH_TOKEN', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GITHUB_TOKEN'];
 const suggestions = computed(() => SUGGESTED.filter((n) => !names.value.includes(n)));
 const nameOk = computed(() => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name.value));
@@ -25,6 +33,15 @@ const replacing = computed(() => names.value.includes(name.value));
 const canSave = computed(() => nameOk.value && value.value.length > 0 && !saving.value);
 
 onMounted(async () => {
+  api
+    .repoPrefix()
+    .then((p) => {
+      savedPrefix.value = p;
+      prefix.value = p;
+    })
+    .catch(() => {
+      /* the field stays empty; saving still works */
+    });
   try {
     names.value = await api.envNames();
   } catch (e) {
@@ -33,6 +50,33 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+async function savePrefix() {
+  if (prefixSaving.value) return;
+  prefixSaving.value = true;
+  prefixError.value = '';
+  prefixSaved.value = '';
+  const typed = prefix.value.trim();
+  try {
+    if (typed === '') {
+      savedPrefix.value = await api.repoPrefixClear();
+      prefixSaved.value = 'Repository folder cleared. New session will not scan until you set one.';
+    } else {
+      savedPrefix.value = await api.repoPrefixSet(typed);
+      prefixSaved.value = 'Repository folder saved. It applies the next time you open New session.';
+    }
+    prefix.value = savedPrefix.value;
+  } catch (e) {
+    prefixError.value = (e as Error).message;
+  } finally {
+    prefixSaving.value = false;
+  }
+}
+
+async function clearPrefix() {
+  prefix.value = '';
+  await savePrefix();
+}
 
 async function save() {
   if (!canSave.value) return;
@@ -75,14 +119,41 @@ async function remove(n: string) {
 </script>
 
 <template>
-  <ModalShell labelledby="settings-title" describedby="settings-desc" initial-focus="#env-name" :width="560" @close="emit('close')">
+  <ModalShell labelledby="settings-title" describedby="settings-desc" initial-focus="#repo-prefix" :width="560" @close="emit('close')">
     <div class="wrap" data-testid="settings-dialog">
       <header class="fhead">
-        <h2 id="settings-title">Session environment</h2>
+        <h2 id="settings-title">Settings</h2>
         <button type="button" class="icon-btn" aria-label="Close" @click="emit('close')">
           <AppIcon name="close" :size="16" />
         </button>
       </header>
+      <form class="prefix" novalidate autocomplete="off" @submit.prevent="savePrefix">
+        <label for="repo-prefix">Repository folder</label>
+        <div class="prefix-row">
+          <input
+            id="repo-prefix"
+            v-model="prefix"
+            class="input mono"
+            spellcheck="false"
+            placeholder="~/projects"
+            :aria-invalid="!!prefixError"
+            :aria-describedby="prefixError ? 'repo-prefix-hint repo-prefix-error' : 'repo-prefix-hint'"
+          />
+          <button type="submit" class="btn btn--primary" :disabled="prefixSaving || !prefixDirty" data-testid="prefix-save">
+            {{ prefixSaving ? 'Saving…' : 'Save folder' }}
+          </button>
+          <button v-if="savedPrefix" type="button" class="btn" :disabled="prefixSaving" @click="clearPrefix">Clear</button>
+        </div>
+        <p id="repo-prefix-hint" class="hint">
+          Only git repos under this folder are listed when you start a session. Leave empty to turn scanning off.
+        </p>
+        <p v-if="prefixError" id="repo-prefix-error" class="ferror" role="alert" data-testid="prefix-error">
+          <AppIcon name="alert" :size="16" />{{ prefixError }}
+        </p>
+        <p v-if="prefixSaved" class="ok" role="status" data-testid="prefix-saved">{{ prefixSaved }}</p>
+      </form>
+
+      <h3 class="sub env-head">Session environment</h3>
       <p id="settings-desc" class="desc">
         Added to every Claude session you start, for example <code>CLAUDE_CODE_OAUTH_TOKEN</code> or
         <code>GEMINI_API_KEY</code>. Values are stored in <code>~/.ccctl/config.toml</code> on this host and are never
@@ -195,6 +266,22 @@ code {
   margin: 0 0 8px;
   font-size: 13px;
   font-weight: 600;
+}
+.prefix {
+  padding: 8px 20px 4px;
+}
+.prefix .ferror,
+.prefix .ok {
+  margin: 8px 0 0;
+}
+.prefix-row {
+  display: flex;
+  gap: 8px;
+}
+.env-head {
+  margin: 12px 0 6px;
+  padding: 12px 20px 0;
+  border-top: 1px solid var(--rule);
 }
 .list {
   padding: 8px 20px;

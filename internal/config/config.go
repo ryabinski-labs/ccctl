@@ -18,7 +18,9 @@ const MaxSessions = 6
 const DefaultPort = 7681
 
 type Config struct {
-	Roots         []string `toml:"roots"`
+	// RepoPrefix is the one folder scanned for the launch list; empty means no scan.
+	// An old roots key in the file is ignored.
+	RepoPrefix    string   `toml:"repo_prefix"`
 	Port          int      `toml:"port"`
 	AllowedLogins []string `toml:"allowed_logins"`
 	ClaudePath    string   `toml:"claude_path"`
@@ -45,14 +47,8 @@ func Load(home string) (Config, error) {
 	return c, nil
 }
 
-// ApplyDefaults fills unset fields (A-020, A-022) and expands ~ in paths.
+// ApplyDefaults fills unset fields (A-022) and expands ~ in paths.
 func (c *Config) ApplyDefaults(home string, lookPath func(string) (string, error)) {
-	if len(c.Roots) == 0 {
-		c.Roots = []string{"~/projects", "~/Documents"}
-	}
-	for i, r := range c.Roots {
-		c.Roots[i] = Expand(home, r)
-	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
 	}
