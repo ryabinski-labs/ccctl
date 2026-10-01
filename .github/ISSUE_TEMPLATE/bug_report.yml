@@ -1,0 +1,21 @@
+name: Bug report
+description: Report a reproducible problem
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Host OS and arch, ccctl release tag, Claude Code version, and the relevant lines from ~/.ccctl/logs/. Remove secrets, hostnames, and IPs you do not want public.

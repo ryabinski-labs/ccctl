@@ -10,6 +10,8 @@ created: 2026-09-30
 
 # PRD: Claude Code controller
 
+> Historical design record, written before the project was open-sourced. Where it says the repository is private, or names example hosts and Tailscale addresses, read them as examples. The README is the current user documentation.
+
 ## 0. Source prompt
 
 > The risk portfolio portion of the portfolio should be changed for preservation. I want to build a Claude Code controller, which would allow me to run multiple sessions of Claude Code on the remote device see everything it's doing and feed it in input or output. This should be a web interface and should allow me to run four terminals at once working on four different tasks. The connection should be over tail scale.
@@ -20,7 +22,7 @@ The user runs several Claude Code tasks in parallel on a workstation and has no 
 
 Evidence: the user's request (§0). No existing tool covers this; `tmux` and `ttyd` are installed on neither Mac (checked 2026-09-30).
 
-**Target hosts (inspected over SSH on 2026-09-30):** the first host is `mac-mini` (Tailscale 100.82.27.73, macOS 27.0, arm64, sleep disabled). It has `claude` 2.1.270 at `~/.local/bin/claude`, git 2.50.1, Go, and Node. It has no `tailscale` CLI on PATH: the only Tailscale binary is `/Applications/Tailscale.app/Contents/MacOS/Tailscale`. It has no `~/projects` folder; its git repos sit under `~/Documents` and `~`. Port 7681 is free. The viewing device is `yonis-macbook-pro` (100.66.98.34).
+**Target hosts (inspected over SSH on 2026-09-30):** the first host is `mac-mini` (Tailscale 100.64.0.10, macOS 27.0, arm64, sleep disabled). It has `claude` 2.1.270 at `~/.local/bin/claude`, git 2.50.1, Go, and Node. It has no `tailscale` CLI on PATH: the only Tailscale binary is `/Applications/Tailscale.app/Contents/MacOS/Tailscale`. It has no `~/projects` folder; its git repos sit under `~/Documents` and `~`. Port 7681 is free. The viewing device is `laptop` (100.64.0.20).
 
 ## 2. Target user
 

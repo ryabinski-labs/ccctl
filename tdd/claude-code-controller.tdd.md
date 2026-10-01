@@ -216,7 +216,7 @@
 
 #### SC-004-f — End-to-end output latency over the tailnet  `acceptance` `red`
 
-- **Given** the controller on mac-mini with 4 busy sessions and the page open on yonis-macbook-pro
+- **Given** the controller on mac-mini with 4 busy sessions and the page open on laptop
 - **When** 200 timestamped echo samples are sent through pane 1
 - **Then** the p95 output-to-render latency is within budget
 - **Oracle:** p95(render_time - send_time) over 200 samples <= 250 ms
@@ -628,7 +628,7 @@
 - **Given** a merged release and mac-mini with Tailscale running
 - **When** the owner runs ccctl install and then ccctl status on mac-mini
 - **Then** the launchd agent is loaded and the status shows the URL
-- **Oracle:** ccctl status prints 'http://100.82.27.73:7681' AND launchctl list contains the ccctl agent
+- **Oracle:** ccctl status prints 'http://100.64.0.10:7681' AND launchctl list contains the ccctl agent
 - **Test:** _not scaffolded_
 
 #### SC-012-f — Crash recovery under the service manager  `acceptance` `red`
@@ -662,7 +662,7 @@
 
 #### SC-013-c — Page first load  `acceptance` `red`
 
-- **Given** the controller on mac-mini and a desktop browser on yonis-macbook-pro
+- **Given** the controller on mac-mini and a desktop browser on laptop
 - **When** the page is loaded with a cold cache
 - **Then** load completes within budget
 - **Oracle:** performance timeline loadEventEnd <= 2000 ms

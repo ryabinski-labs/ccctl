@@ -270,12 +270,12 @@ describe('REQ-015 — session environment is set from the page and is write-only
     await flushPromises();
     expect(w.findAll('[data-testid="env-row"]').map((r) => r.text())).toEqual([expect.stringContaining('GEMINI_API_KEY')]);
     await w.get('#env-name').setValue('CLAUDE_CODE_OAUTH_TOKEN');
-    await w.get('#env-value').setValue('sk-ant-oat01-SECRET');
+    await w.get('#env-value').setValue('sk-ant-oat01-CANARY');
     expect(w.get('#env-value').attributes('type')).toBe('password');
     await w.get('form').trigger('submit');
     await flushPromises();
-    expect(set).toHaveBeenCalledWith('CLAUDE_CODE_OAUTH_TOKEN', 'sk-ant-oat01-SECRET');
-    expect(document.body.innerHTML).not.toContain('sk-ant-oat01-SECRET');
+    expect(set).toHaveBeenCalledWith('CLAUDE_CODE_OAUTH_TOKEN', 'sk-ant-oat01-CANARY');
+    expect(document.body.innerHTML).not.toContain('sk-ant-oat01-CANARY');
     expect((w.get('#env-value').element as HTMLInputElement).value).toBe('');
     expect(w.get('[data-testid="env-saved"]').text()).toContain('CLAUDE_CODE_OAUTH_TOKEN saved');
     await w.get('[aria-label="Remove GEMINI_API_KEY"]').trigger('click');
