@@ -29,7 +29,21 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 - You need TLS, per-session permissions, or more than four sessions. None of these exist.
 - You want a hosted service or multi-user product. ccctl is a single-user tool.
 
-Related tools: `tmux` or `screen` over SSH (no status view), and the Claude Code desktop and web apps (hosted by Anthropic, not on your own machine).
+## Compared with
+
+All of these let you reach a Claude Code session from another device. ccctl's niche is a single self-hosted page that shows several live terminals at once and flags the one that needs you. Details below were checked on 2026-10-01 and change often; see each project's docs.
+
+| | ccctl | Claude Code [Remote Control](https://code.claude.com/docs/en/remote-control) | Browser UIs such as [CloudCLI](https://github.com/siteboon/claudecodeui) | `tmux` over SSH |
+|---|---|---|---|---|
+| Where sessions run | Your machine | Your machine | Your machine, or a hosted tier | Your machine |
+| Path to your sessions | Direct, over your tailnet | Through Anthropic's servers; the transcript is stored there | Direct (self-hosted) | Direct, over SSH |
+| Sign-in needed | Your Tailscale login | A claude.ai subscription (API keys are not supported) | None beyond the tool's own | SSH key |
+| Several sessions at a glance | 2x2 grid of live terminals | Session list in the app or claude.ai/code | Session list and tabs | Panes, if you set them up |
+| "Needs input" signal | Amber pane header, tab count, chime | Mobile push notifications | Not documented | None |
+| Worktree per task | Yes, by default for git repos | Optional (`--spawn worktree`) | Not documented | Manual |
+| Cost | Free, MIT | Included with a Claude subscription | Free (AGPL); hosted tier is paid | Free |
+
+Pick Remote Control if you want Anthropic's mobile app and push notifications, and are happy with a claude.ai login. Pick ccctl if you want the traffic to stay on your own tailnet, work with API-key auth, or watch several terminals side by side.
 
 ## Quickstart
 
