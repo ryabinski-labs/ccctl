@@ -1,7 +1,7 @@
 // Command fakeclaude stands in for the claude CLI in tests. It prints a banner
 // (FAKE_CLAUDE cwd=... slot=... argv=... prompt=...), puts its terminal in raw
 // mode, logs every input byte to $FAKECLAUDE_LOG/input-<slot>.bin, and echoes
-// each typed line as "ECHO <line>". Lines "!stop" and "!notify" run the hook
+// each typed line as "ECHO <line>". "!copy TEXT" emits an OSC 52 clipboard write. Lines "!stop" and "!notify" run the hook
 // command from the --settings file; "print A B" prints "slot=S line=n" for n in A..B.
 //
 // Modes ($FAKECLAUDE_MODE_<slot> or $FAKECLAUDE_MODE, comma separated):
@@ -9,6 +9,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -129,6 +130,9 @@ func handle(line, slot, settings, sessionID string) {
 		runHook(settings, "Stop", sessionID)
 	case line == "!notify":
 		runHook(settings, "Notification", sessionID)
+	case strings.HasPrefix(line, "!copy "):
+		// Like Claude Code's selection copy: an OSC 52 clipboard write.
+		fmt.Printf("\x1b]52;c;%s\x07COPIED\r\n", base64.StdEncoding.EncodeToString([]byte(strings.TrimPrefix(line, "!copy "))))
 	case strings.HasPrefix(line, "print "):
 		var a, b int
 		fmt.Sscanf(line, "print %d %d", &a, &b)

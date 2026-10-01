@@ -58,13 +58,23 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);
 let errorTimer: ReturnType<typeof setTimeout> | null = null;
 
+function dismissError() {
+  if (errorTimer) clearTimeout(errorTimer);
+  error.value = '';
+}
+
 function onAttach(s: { busy: boolean; error: string }) {
   uploading.value = s.busy;
   if (errorTimer) clearTimeout(errorTimer);
   if (s.error) {
     error.value = s.error;
-    errorTimer = setTimeout(() => (error.value = ''), 8000);
+    errorTimer = setTimeout(() => (error.value = ''), 12000);
   }
+}
+
+function openPicker() {
+  // aria-disabled (not disabled) while uploading, so keyboard focus stays on the button.
+  if (!uploading.value) fileInput.value?.click();
 }
 
 function pickFiles() {
@@ -122,10 +132,13 @@ function onBlur() {
               :aria-label="`Send a file to ${info.task}`"
               title="Send a file or image (or paste or drop one on the terminal)"
               data-testid="attach"
-              :disabled="uploading"
-              @click="fileInput?.click()"
+              :aria-disabled="uploading"
+              :aria-busy="uploading"
+              :class="{ 'icon-btn--busy': uploading }"
+              @click="openPicker"
             >
-              <AppIcon name="attach" :size="16" />
+              <span v-if="uploading" class="spinner spinner--ink" aria-hidden="true" />
+              <AppIcon v-else name="attach" :size="16" />
             </button>
           </template>
           <button
@@ -162,6 +175,13 @@ function onBlur() {
         </div>
       </header>
 
+      <div v-if="error" class="perror" role="alert">
+        <span class="perror-msg">{{ error }}</span>
+        <button type="button" class="icon-btn icon-btn--sm" aria-label="Dismiss" @click="dismissError">
+          <AppIcon name="close" :size="14" />
+        </button>
+      </div>
+
       <div class="well">
         <TerminalView :slot="slot" @focus="onFocus" @blur="onBlur" @shortcut="handleShortcut" @attach="onAttach" />
 
@@ -185,8 +205,7 @@ function onBlur() {
           <button type="button" class="btn btn--sm" :disabled="busy" @click="closePane">Close pane</button>
         </div>
 
-        <p v-if="uploading" class="pnote mono" role="status">Sending file…</p>
-        <p v-if="error" class="perror" role="alert">{{ error }}</p>
+        <span v-if="uploading" class="sr-only" role="status">Sending file…</span>
       </div>
 
       <StopDialog
@@ -271,8 +290,8 @@ function onBlur() {
   background: var(--wait-fg);
 }
 .task {
-  flex: none;
-  max-width: 34%;
+  flex: 0 1 auto;
+  max-width: 50%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -380,28 +399,27 @@ function onBlur() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pnote {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  margin: 0;
-  padding: 4px 8px;
-  border-radius: var(--radius);
-  background: var(--panel);
-  color: var(--ink-2);
-  font-size: 12px;
-}
 .perror {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  top: 8px;
-  margin: 0;
-  padding: 8px 10px;
-  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  padding: 4px 6px 4px 10px;
   background: var(--err-soft);
+  border-bottom: 1px solid #efb8b2;
   color: #7a1a12;
   font-size: 12px;
+}
+.perror-msg {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.spinner--ink {
+  width: 14px;
+  height: 14px;
+  border-color: rgba(28, 27, 24, 0.2);
+  border-top-color: var(--ink);
 }
 
 /* Free slot: a light dashed card — reads as "empty" at a glance next to dark wells. */

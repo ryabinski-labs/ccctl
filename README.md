@@ -11,7 +11,7 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 | | |
 |---|---|
 | **What it is** | One Go binary (`ccctl`) with an embedded Vue 3 + xterm.js web UI, run as a background service on the host that runs Claude Code. |
-| **Who it is for** | People who run several Claude Code sessions in parallel on a Mac or Linux box (a Mac mini, a home server) and want to check on them from a laptop, tablet, or phone. |
+| **Who it is for** | People who run several Claude Code sessions in parallel on a Mac or Linux box (a Mac mini, a home server) and want to check on them from a laptop or desktop browser (the page needs a window at least 1024 px wide; phone layouts are not supported). |
 | **Problem it solves** | Parallel agent sessions sit blocked on a prompt in a terminal you are not looking at. ccctl shows all of them in one page and flags the one that needs you: an amber pane header, a tab-title count, and an optional chime. |
 | **Outcome** | Start, watch, and answer up to four sessions from any device on your tailnet, with each task isolated in its own git worktree. |
 | **Status** | Early (`v0.1.x`). Used daily by its author. Expect rough edges and breaking changes. |
@@ -71,7 +71,7 @@ Expected result: `ccctl status` prints the controller URL, for example `http://1
 - **One binary.** `ccctl` is a Go program with the Vue 3 + xterm.js frontend embedded in it.
 - **Sessions.** Each session is `claude --dangerously-skip-permissions --session-id UUID --settings FILE [prompt]` running in its own PTY. For git repos, each task gets its own worktree at `<repo>-wt-<task>` on branch `ctl/<task>`, created from HEAD. Worktrees and branches are never removed by ccctl.
 - **Needs input.** Claude Code's `Notification` and `Stop` hooks call `ccctl hook --slot N` over `~/.ccctl/ccctl.sock`. The pane header turns amber, the tab title shows a count, and a chime plays (you can mute it).
-- **Files and images.** Paste a file or screenshot onto a pane, drop one on it, or use the paperclip button in the pane header. ccctl saves it on the host in `~/.ccctl/uploads` (up to 25 MB each, never removed) and types its path into the session, which is how Claude Code attaches an image. Pasting text works as in any terminal.
+- **Files and images.** Paste a file or screenshot onto a pane, drop one on it, or use the paperclip button in the pane header. ccctl saves it on the host in `~/.ccctl/uploads` (up to 25 MB each; ccctl removes its own uploads after 14 days and refuses new ones once the folder passes 1 GB) and types its path into the session, which is how Claude Code attaches an image. Pasting text works as in any terminal.
 - **Restarts.** Live sessions are recorded in `~/.ccctl/state.json` and resumed with `claude --resume` when ccctl starts again.
 - **Scrollback.** Each session keeps its last 1 MiB of output in memory and replays it when a browser connects.
 
