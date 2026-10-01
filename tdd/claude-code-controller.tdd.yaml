@@ -195,8 +195,8 @@ requirements:
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-002-g
     status: green
 - id: REQ-003
-  text: The launch form lists git repos found up to 3 folder levels under each existing root (default ~/projects and ~/Documents)
-    plus direct children of home, and also accepts a custom path.
+  text: The launch form lists git repos from the one folder saved in Settings and also accepts a custom path. Superseded
+    for scanning by tdd/repo-prefix.tdd.yaml (the roots scan was removed, DL-002 in docs/prd/repo-prefix.md).
   priority: P0
   type: functional
   prd_ref: §6 launch form; DL-011; A-020
@@ -212,8 +212,7 @@ requirements:
     doubles: real filesystem temp HOME
     tags:
     - go
-    test_ref: internal/tdd/unit_test.go::SC-003-a
-    status: green
+    status: obsolete
   - id: SC-003-b
     level: unit
     title: Repo scan skips linked worktrees
@@ -225,8 +224,7 @@ requirements:
     tags:
     - go
     - found-in-visual-qa
-    test_ref: internal/tdd/unit_test.go::SC-003-b
-    status: green
+    status: obsolete
 - id: REQ-004
   text: The owner sees every session's live output in its own pane and keystrokes typed in a pane reach only that session's
     PTY; a maximized pane resizes its PTY.

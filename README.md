@@ -99,7 +99,9 @@ The service gets your install-time `PATH`, so Claude's tools find `git`, `go`, `
 
 To roll back, run `ccctl install --version <previous tag>`. `ccctl uninstall` removes the service only. It keeps `~/.ccctl` and every worktree.
 
-**macOS privacy prompt:** the first time the launchd agent scans `~/Documents` for repos, macOS asks whether `ccctl` may access Documents. The dialog shows on the host's own screen (use Screen Sharing on a headless Mac). Click Allow, or scanning `~/Documents` finds nothing.
+**Repository folder:** nothing is scanned until you set one. Open Settings, enter the folder that holds your repos (for example `~/projects`), and press Save folder. New session then lists only the git repos under it. You can always type any folder with "Use a custom path".
+
+**macOS privacy prompt:** the first time the launchd agent scans a folder under `~/Documents`, `~/Desktop` or `~/Downloads`, macOS asks whether `ccctl` may access it. The dialog shows on the host's own screen (use Screen Sharing on a headless Mac). Click Allow. Until then the scan waits, and after 10 seconds New session says so and offers Retry.
 
 ### Environment for sessions (API keys)
 
@@ -142,7 +144,7 @@ Exit codes: 0 success, 1 runtime error, 2 usage error, 3 Tailscale not running.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `roots` | `["~/projects", "~/Documents"]` | Folders scanned up to 3 levels deep for git repos. Missing roots are skipped. Direct children of `~` are always checked. |
+| `repo_prefix` | unset (no scan) | The one folder New session scans, up to 3 levels deep, for git repos. Set it in Settings or here. A `roots` key from an older version is ignored. |
 | `port` | `7681` | HTTP port, bound only on the host's Tailscale IPv4. |
 | `allowed_logins` | the host node's Tailscale login | Tailscale logins allowed to use the controller. |
 | `claude_path` | recorded by `ccctl install` | Absolute path of the `claude` binary. |

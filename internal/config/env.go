@@ -63,6 +63,23 @@ func SetEnv(home, name string, value *string) error {
 	if value != nil && (len(*value) > MaxEnvValue || strings.ContainsRune(*value, 0)) {
 		return fmt.Errorf("Value must be at most %d bytes of text.", MaxEnvValue)
 	}
+	return editConfig(home, func(raw map[string]any) {
+		env, _ := raw["env"].(map[string]any)
+		if env == nil {
+			env = map[string]any{}
+		}
+		if value == nil {
+			delete(env, name)
+		} else {
+			env[name] = *value
+		}
+		raw["env"] = env
+	})
+}
+
+// editConfig applies edit to the decoded config.toml and writes it back
+// atomically with mode 0600, preserving every key edit does not touch.
+func editConfig(home string, edit func(raw map[string]any)) error {
 	writeMu.Lock()
 	defer writeMu.Unlock()
 	p := Path(home)
@@ -70,16 +87,7 @@ func SetEnv(home, name string, value *string) error {
 	if _, err := toml.DecodeFile(p, &raw); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	env, _ := raw["env"].(map[string]any)
-	if env == nil {
-		env = map[string]any{}
-	}
-	if value == nil {
-		delete(env, name)
-	} else {
-		env[name] = *value
-	}
-	raw["env"] = env
+	edit(raw)
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return err
 	}

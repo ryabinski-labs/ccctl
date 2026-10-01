@@ -16,7 +16,6 @@ import (
 	"github.com/ryabinski-labs/claude-code-controller/internal/app"
 	"github.com/ryabinski-labs/claude-code-controller/internal/auth"
 	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/repos"
 	"github.com/ryabinski-labs/claude-code-controller/internal/session"
 	"github.com/ryabinski-labs/claude-code-controller/internal/state"
 	"github.com/ryabinski-labs/claude-code-controller/internal/tailscale"
@@ -77,24 +76,6 @@ func TestSc002FFirstPromptLengthBoundary(t *testing.T) {
 	}
 	if err := session.ValidatePrompt(strings.Repeat("x", 10001)); err == nil {
 		t.Error("10001 accepted")
-	}
-}
-
-// SC-003-a
-func TestSc003ARepoScanDepthAndMissingRoots(t *testing.T) {
-	home := t.TempDir()
-	for _, p := range []string{"Documents/a", "Documents/x/y/b", "Documents/x/y/z/c", "d"} {
-		os.MkdirAll(filepath.Join(home, p, ".git"), 0o755)
-	}
-	var c config.Config
-	c.ApplyDefaults(home, func(string) (string, error) { return "", errors.New("none") })
-	got := map[string]bool{}
-	for _, r := range repos.Scan(home, c.Roots) {
-		got[r.Path] = true
-	}
-	want := map[string]bool{filepath.Join(home, "Documents/a"): true, filepath.Join(home, "Documents/x/y/b"): true, filepath.Join(home, "d"): true}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("scan = %v; want %v", got, want)
 	}
 }
 
@@ -274,17 +255,5 @@ func TestSc006HTailscaleCliRunsInCliModeUnderAServiceManager(t *testing.T) {
 	env := tailscale.CLIEnv([]string{"HOME=/h", "PATH=/usr/bin:/bin"})
 	if !slices.Contains(env, "TAILSCALE_BE_CLI=1") || !slices.Contains(env, "HOME=/h") {
 		t.Fatalf("env = %v", env)
-	}
-}
-
-// SC-003-b
-func TestSc003BRepoScanSkipsLinkedWorktrees(t *testing.T) {
-	home := t.TempDir()
-	os.MkdirAll(filepath.Join(home, "Documents/folio/.git"), 0o755)
-	os.MkdirAll(filepath.Join(home, "Documents/folio-wt-fix-login"), 0o755)
-	os.WriteFile(filepath.Join(home, "Documents/folio-wt-fix-login/.git"), []byte("gitdir: ../folio/.git/worktrees/fix-login\n"), 0o644)
-	got := repos.Scan(home, []string{filepath.Join(home, "Documents")})
-	if len(got) != 1 || got[0].Name != "folio" {
-		t.Fatalf("scan = %+v", got)
 	}
 }

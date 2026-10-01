@@ -161,6 +161,7 @@ type Opts struct {
 	TS          *FakeTS
 	NoWaitBind  bool
 	Allowed     []string
+	ScanTimeout time.Duration // repo scan limit (default 10 s)
 }
 
 type H struct {
@@ -210,7 +211,7 @@ func Start(t testing.TB, o Opts) *H {
 	lb := &LogBuf{}
 	a, err := app.New(app.Options{
 		Home: home, Config: cfg, TS: o.TS, Interval: o.Interval, CCCTLPath: ccctl, Env: env,
-		Log: slog.New(slog.NewJSONHandler(lb, nil)), StopGrace: o.StopGrace, ResumeGrace: o.ResumeGrace,
+		Log: slog.New(slog.NewJSONHandler(lb, nil)), StopGrace: o.StopGrace, ResumeGrace: o.ResumeGrace, ScanTimeout: o.ScanTimeout,
 		SockPath: filepath.Join(sockDir, "s.sock"),
 	})
 	if err != nil {

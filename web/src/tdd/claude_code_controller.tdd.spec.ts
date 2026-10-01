@@ -19,7 +19,10 @@ vi.mock('../lib/api', () => {
       envNames: vi.fn(async () => []),
       envSet: vi.fn(async () => []),
       envRemove: vi.fn(async () => []),
-      repos: vi.fn(async () => [{ name: 'notes', path: '/h/notes', display: '~/notes' }]),
+      repos: vi.fn(async () => ({ repos: [{ name: 'notes', path: '/h/notes', display: '~/notes' }], prefix: '~' })),
+      repoPrefix: vi.fn(async () => ''),
+      repoPrefixSet: vi.fn(async (p: string) => p),
+      repoPrefixClear: vi.fn(async () => ''),
       inspect: vi.fn(async (path: string) => ({
         path,
         git: false,
@@ -272,7 +275,7 @@ describe('REQ-015 — session environment is set from the page and is write-only
     await w.get('#env-name').setValue('CLAUDE_CODE_OAUTH_TOKEN');
     await w.get('#env-value').setValue('sk-ant-oat01-CANARY');
     expect(w.get('#env-value').attributes('type')).toBe('password');
-    await w.get('form').trigger('submit');
+    await w.get('form.add').trigger('submit');
     await flushPromises();
     expect(set).toHaveBeenCalledWith('CLAUDE_CODE_OAUTH_TOKEN', 'sk-ant-oat01-CANARY');
     expect(document.body.innerHTML).not.toContain('sk-ant-oat01-CANARY');
