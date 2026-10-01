@@ -1,0 +1,38 @@
+# GoReleaser v2. Release binaries for darwin and linux on arm64 and amd64 (A-017).
+version: 2
+project_name: ccctl
+
+before:
+  hooks:
+    - npm --prefix web ci
+    - npm --prefix web run build
+
+builds:
+  - id: ccctl
+    main: ./cmd/ccctl
+    binary: ccctl
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: ccctl
+    formats: [tar.gz]
+    name_template: "ccctl_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
+
+release:
+  github:
+    owner: ryabinski-labs
+    name: claude-code-controller

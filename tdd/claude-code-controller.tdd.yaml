@@ -1,0 +1,1022 @@
+schema: tdd-artifact/v1
+feature: claude-code-controller
+title: Claude Code controller
+source:
+  prd: docs/prd/claude-code-controller.md
+  prd_sha256: 09a54d8326ffff4e11ba9ad64402b921bfd39bafe20519b1c5f17f37e71a4f9e
+defaults:
+  priority: P2
+non_goals:
+- Mobile phone layout and on-screen key bar (DL-005)
+- Structured chat or diff view, Agent SDK, or stream-json rendering (DL-001)
+- Controlling more than one host from one page (DL-001)
+- tmux integration or attaching to sessions over SSH (DL-001)
+- Read-only viewers or multi-user roles (DL-006)
+- More than 4 concurrent sessions (DL-010)
+- HTTPS, TLS certificates, and OS-level browser notifications (DL-009)
+- Permission modes other than bypass (DL-008)
+- Automatic worktree removal (DL-012)
+- Managing Claude credentials, API keys, or billing (A-007)
+open_questions:
+- id: OQ-1
+  text: With 3 sessions running and an exited pane not yet closed, can New session launch, and where?
+  blocks:
+  - REQ-007
+  resolved: true
+  resolution: 'DL-016: exited and resume-failed panes count as free; the lowest free slot is replaced.'
+- id: OQ-2
+  text: What does Start fresh launch after a failed resume?
+  blocks:
+  - REQ-009
+  resolved: true
+  resolution: 'DL-017: a new session with a new UUID in the same slot, worktree, and branch.'
+requirements:
+- id: REQ-001
+  text: The owner can launch a Claude Code session into a free slot for a named task; it starts within 5 seconds in a new
+    git worktree on branch ctl/TASK with --dangerously-skip-permissions and a recorded --session-id.
+  priority: P0
+  type: functional
+  prd_ref: §5 story 1 criteria 1-2; DL-008; DL-012 worktree naming
+  scenarios:
+  - id: SC-001-a
+    level: acceptance
+    title: Launch form starts a live session in a new worktree
+    given: the controller runs with the fake claude, the owner's Tailscale login, a git repo folio under a scanned root, and
+      4 free slots
+    when: the owner submits the launch form with task fix-login, repo folio, worktree on, first prompt hello world
+    then: slot 1 shows the fake claude banner reporting the worktree cwd, the bypass flag, the session UUID, and the prompt
+    oracle: within 5000 ms pane 1 text contains 'FAKE_CLAUDE cwd=ROOT/folio-wt-fix-login', '--dangerously-skip-permissions',
+      '--session-id UUID' and 'prompt=hello world'; state.json slots[0].session_id == UUID
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    data:
+      task: fix-login
+      repo: folio
+      prompt: hello world
+    tags:
+    - playwright
+    test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-001-a
+    status: green
+  - id: SC-001-b
+    level: integration
+    title: Worktree is a sibling folder on ctl/TASK from HEAD
+    given: a temporary git repo folio with HEAD at commit C
+    when: the session manager prepares a worktree for task fix-login
+    then: folder folio-wt-fix-login exists next to folio on new branch ctl/fix-login at commit C
+    oracle: git -C ../folio-wt-fix-login rev-parse --abbrev-ref HEAD == 'ctl/fix-login' AND rev-parse HEAD == C
+    doubles: real git in a temp directory
+    tags:
+    - go
+    test_ref: internal/tdd/launch_test.go::SC-001-b
+    status: green
+  - id: SC-001-c
+    level: unit
+    title: Fresh-launch argv
+    given: claude_path /h/.local/bin/claude, session UUID U, settings file F
+    when: the launch argv is built with and without a first prompt
+    then: the argv carries the bypass flag, the session id and the settings file, and the prompt only when given
+    oracle: argv == [claude_path, '--dangerously-skip-permissions', '--session-id', U, '--settings', F, 'hello'] with prompt;
+      identical minus the last element without prompt
+    doubles: none; pure function
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-001-c
+    status: green
+  - id: SC-001-d
+    level: integration
+    title: Config [env] reaches every session and reloads without a restart
+    given: ~/.ccctl/config.toml with [env] GEMINI_API_KEY = key-one and CCCTL_SOCK = /evil
+    when: a session launches, the file is edited to key-two, and a second session launches
+    then: each session gets the value current at its launch, ccctl's own variables cannot be overridden, and no value is logged
+    oracle: session 1 env has GEMINI_API_KEY=key-one and not CCCTL_SOCK=/evil AND session 2 env has GEMINI_API_KEY=key-two AND the log contains neither value
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    - user-request
+    test_ref: internal/tdd/launch_test.go::SC-001-d
+    status: green
+- id: REQ-002
+  text: Invalid launch input is refused with the spec's message and no session, folder, or branch is created.
+  priority: P0
+  type: functional
+  prd_ref: §5 story 1 criteria 3-7; A-008
+  scenarios:
+  - id: SC-002-a
+    level: unit
+    title: Task name rules and boundaries
+    given: open sessions named fix-login
+    when: each candidate task name is validated
+    then: valid names are normalized to lowercase and invalid ones are refused with the rule message
+    oracle: 'accepted: ''a'', 40x''a'', ''Fix-Api'' -> ''fix-api''; refused with exact text ''Task name must be 1 to 40 characters
+      of a-z, 0-9 or -, and unique among open sessions.'': '''', 41x''a'', ''fix_login'', ''fix login'', ''café'', ''fix-login'''
+    doubles: none; pure function
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-002-a
+    status: green
+  - id: SC-002-b
+    level: unit
+    title: Custom path rules
+    given: a temp dir D containing file f.txt
+    when: custom paths '/opt/x' (missing), 'D/f.txt' (file), 'rel/path' (relative), and D are validated
+    then: only D is accepted; the others are refused
+    oracle: '''/opt/x'' refused with exact text ''Path /opt/x does not exist or is not a folder.''; ''D/f.txt'' refused with
+      the same pattern; ''rel/path'' refused; D accepted'
+    doubles: real filesystem temp dir
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-002-b
+    status: green
+  - id: SC-002-c
+    level: integration
+    title: Existing worktree folder or branch blocks launch
+    given: repo folio where folder folio-wt-fix-login already exists, and separately where branch ctl/fix-login already exists
+    when: a launch for task fix-login is requested
+    then: the launch is refused and nothing is created or spawned
+    oracle: response error == 'Worktree folder or branch for fix-login already exists. Choose another task name.' AND fake
+      claude invocation count == 0 AND git branch list and folder list unchanged
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs; real git
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/launch_test.go::SC-002-c
+    status: green
+  - id: SC-002-d
+    level: integration
+    title: Non-git folder runs without a worktree
+    given: a plain folder notes with no .git
+    when: the folder is inspected and then launched with worktree off
+    then: inspection reports worktree unavailable with the note and the session runs in the folder itself
+    oracle: 'inspect response worktree_allowed == false AND note == ''Not a git repository: session runs in the folder itself.''
+      AND fake claude reports cwd == notes AND no folder notes-wt-* exists'
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/launch_test.go::SC-002-d
+    status: green
+  - id: SC-002-e
+    level: integration
+    title: Missing claude binary is reported
+    given: claude_path points to a path with no executable file
+    when: a launch is requested
+    then: the launch is refused with the configuration message
+    oracle: response error == 'Claude Code was not found at CLAUDE_PATH. Set claude_path in ~/.ccctl/config.toml.' with CLAUDE_PATH
+      replaced AND no process started
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/launch_test.go::SC-002-e
+    status: green
+  - id: SC-002-f
+    level: unit
+    title: First prompt length boundary
+    given: first prompts of 10,000 and 10,001 characters
+    when: each launch request is validated
+    then: 10,000 characters is accepted and 10,001 is refused with no session
+    oracle: validate(len 10000) == ok AND validate(len 10001) returns an error
+    doubles: none; pure function
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-002-f
+    status: green
+  - id: SC-002-g
+    level: unit
+    title: Launch form disables worktree for non-git folders
+    given: 'the repo inspection result {worktree_allowed: false}'
+    when: the launch form renders for that folder
+    then: the worktree toggle is off and disabled and the note is shown
+    oracle: 'toggle.checked == false AND toggle.disabled == true AND text ''Not a git repository: session runs in the folder
+      itself.'' is visible'
+    doubles: mocked inspection API response
+    tags:
+    - vitest
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-002-g
+    status: green
+- id: REQ-003
+  text: The launch form lists git repos found up to 3 folder levels under each existing root (default ~/projects and ~/Documents)
+    plus direct children of home, and also accepts a custom path.
+  priority: P0
+  type: functional
+  prd_ref: §6 launch form; DL-011; A-020
+  scenarios:
+  - id: SC-003-a
+    level: integration
+    title: Repo scan depth and missing roots
+    given: a temp HOME with no projects folder, Documents/a (depth 1), Documents/x/y/b (depth 3), Documents/x/y/z/c (depth
+      4), and HOME/d, each with .git
+    when: the repo scanner runs with default roots
+    then: repos at depth 3 or less and home children are listed, depth 4 is not, and the missing root is skipped
+    oracle: result set == {Documents/a, Documents/x/y/b, HOME/d} AND scanner returned no error
+    doubles: real filesystem temp HOME
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-003-a
+    status: green
+  - id: SC-003-b
+    level: unit
+    title: Repo scan skips linked worktrees
+    given: Documents/folio (a repo) and Documents/folio-wt-fix-login (a linked worktree with a .git file)
+    when: the repo scanner runs
+    then: only the repo is listed
+    oracle: result == [folio]
+    doubles: real filesystem temp HOME
+    tags:
+    - go
+    - found-in-visual-qa
+    test_ref: internal/tdd/unit_test.go::SC-003-b
+    status: green
+- id: REQ-004
+  text: The owner sees every session's live output in its own pane and keystrokes typed in a pane reach only that session's
+    PTY; a maximized pane resizes its PTY.
+  priority: P0
+  type: functional
+  prd_ref: §5 story 2
+  scenarios:
+  - id: SC-004-a
+    level: acceptance
+    title: Typing in pane 2 reaches only session 2
+    given: 4 running fake claude sessions that echo every received byte
+    when: the owner focuses pane 2 and types hello and Enter
+    then: pane 2 shows the echo and no other session received input
+    oracle: pane 2 text contains 'ECHO hello' within 2000 ms AND fake claude input logs for slots 1, 3, 4 are empty
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - playwright
+    test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-004-a
+    status: green
+  - id: SC-004-b
+    level: integration
+    title: Input bytes route exactly to one PTY
+    given: 4 sessions connected to one WebSocket client
+    when: the client sends input frames for slot 2 carrying 'hello\r', ESC, Ctrl-C, and ESC [A
+    then: session 2's PTY receives exactly those bytes and the others receive none
+    oracle: bytes read by fake 2 == 68656c6c6f0d 1b 03 1b5b41 (hex, concatenated) AND fakes 1, 3, 4 read 0 bytes within 500
+      ms
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/io_test.go::SC-004-b
+    status: green
+  - id: SC-004-c
+    level: integration
+    title: Output fan-out keeps per-slot order
+    given: 4 fake sessions that each print lines 1..1000 tagged with their slot
+    when: a WebSocket client collects output frames
+    then: every slot's lines arrive complete and in order and tagged with the right slot
+    oracle: for each slot s, parsed line numbers from frames tagged s == [1..1000] in order AND no line tagged s contains
+      another slot's marker
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/io_test.go::SC-004-c
+    status: green
+  - id: SC-004-d
+    level: integration
+    title: Resize frame sets PTY window size
+    given: a running session in slot 3
+    when: the client sends a resize frame of 50 rows by 200 columns for slot 3
+    then: the PTY window size matches
+    oracle: TIOCGWINSZ on slot 3's PTY returns rows == 50 AND cols == 200
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/io_test.go::SC-004-d
+    status: green
+  - id: SC-004-e
+    level: unit
+    title: Maximize and restore
+    given: the grid with 4 panes
+    when: the owner clicks maximize on pane 3 and then restore
+    then: pane 3 alone fills the grid, then the 2x2 layout returns
+    oracle: after maximize exactly 1 pane is visible (slot 3); after restore 4 panes are visible in a 2-column grid
+    doubles: mocked session store
+    tags:
+    - vitest
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-004-e
+    status: green
+  - id: SC-004-f
+    level: acceptance
+    title: End-to-end output latency over the tailnet
+    given: the controller on mac-mini with 4 busy sessions and the page open on yonis-macbook-pro
+    when: 200 timestamped echo samples are sent through pane 1
+    then: the p95 output-to-render latency is within budget
+    oracle: p95(render_time - send_time) over 200 samples <= 250 ms
+    tags:
+    - nfr
+    - manual
+    status: red
+- id: REQ-005
+  text: 'Only Tailscale logins in allowed_logins (default: the host node''s own login) can load the page or open the WebSocket;
+    every other caller gets HTTP 403, and the listener binds only to the host''s Tailscale IPv4.'
+  priority: P0
+  type: functional
+  prd_ref: §5 story 3; DL-006; A-006; §13 security
+  scenarios:
+  - id: SC-005-a
+    level: unit
+    title: Authorization decision table
+    given: allowlist [owner@example]
+    when: authorize is called for owner@example, other@example, and a WhoIs failure with empty login
+    then: only the listed login is allowed
+    oracle: 'results == {owner@example: allow, other@example: deny, '''' (WhoIs error): deny}'
+    doubles: none; pure function
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-005-a
+    status: green
+  - id: SC-005-b
+    level: integration
+    title: Unlisted login gets the 403 page and an audit line
+    given: the fake WhoIs maps the caller to other@example
+    when: the caller requests GET /
+    then: the controller refuses with the named page and logs auth_denied
+    oracle: 'status == 403 AND body contains ''Not authorized: other@example is not on this controller\''s allowlist.'' AND
+      a JSON log line has event == auth_denied, login == other@example, path == /'
+    doubles: fake WhoIs; real HTTP server on 127.0.0.1
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/auth_test.go::SC-005-b
+    status: green
+  - id: SC-005-c
+    level: integration
+    title: Unlisted login cannot open the WebSocket
+    given: the fake WhoIs maps the caller to other@example and one session is running
+    when: the caller attempts the WebSocket upgrade and sends an input frame
+    then: the upgrade is refused and the session receives nothing
+    oracle: upgrade status == 403 AND fake claude read 0 bytes
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/auth_test.go::SC-005-c
+    status: green
+  - id: SC-005-d
+    level: integration
+    title: Foreign or missing Origin is refused
+    given: the fake WhoIs maps the caller to the owner
+    when: WebSocket upgrades arrive with Origin https://evil.example and with no Origin
+    then: both are refused
+    oracle: both upgrade statuses == 403
+    doubles: fake WhoIs
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/auth_test.go::SC-005-d
+    status: green
+  - id: SC-005-e
+    level: integration
+    title: Listener binds only to the Tailscale IPv4
+    given: the fake Tailscale status reports IPv4 T and the host has another non-loopback address L
+    when: the controller starts serving on port P
+    then: only T:P accepts connections
+    oracle: listener.Addr() == T:P AND dialing L:P fails with connection refused
+    doubles: fake Tailscale status
+    tags:
+    - go
+    test_ref: internal/tdd/auth_test.go::SC-005-e
+    status: green
+  - id: SC-005-f
+    level: unit
+    title: Default allowlist is the host node's login
+    given: tailscale status JSON whose Self.UserID maps to login owner@example and a config without allowed_logins
+    when: the config is loaded
+    then: the effective allowlist is the host node's login
+    oracle: effective allowed_logins == ['owner@example']
+    doubles: status JSON fixture
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-005-f
+    status: green
+  - id: SC-005-g
+    level: unit
+    title: WhoIs results cached 60 seconds per address
+    given: a fake clock and a counting fake WhoIs
+    when: the same remote address is looked up at t=0, t=59s and t=61s
+    then: WhoIs is called at t=0 and t=61s only
+    oracle: whois call count == 1 after t=59s AND == 2 after t=61s
+    doubles: fake clock; counting fake WhoIs
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-005-g
+    status: green
+  - id: SC-005-h
+    level: integration
+    title: Every route enforces the allowlist
+    given: the full registered route table and a caller mapped to other@example
+    when: each route is requested
+    then: every route answers 403
+    oracle: 'for all routes r in the router: status(r) == 403'
+    doubles: fake WhoIs
+    negative: true
+    tags:
+    - security
+    - go
+    test_ref: internal/tdd/auth_test.go::SC-005-h
+    status: green
+- id: REQ-006
+  text: 'The controller checks Tailscale every 10 seconds: when Tailscale is not Running it serves nothing and reports the
+    spec message, keeps sessions alive, and binds again when Tailscale returns; the page shows a reconnect banner with 1,
+    2, 4, 8, 16, then 30 second retries.'
+  priority: P0
+  type: functional
+  prd_ref: §5 story 4; DL-007; A-005; A-021
+  scenarios:
+  - id: SC-006-a
+    level: unit
+    title: Tailscale CLI discovery order
+    given: combinations of tailscale_path in config, tailscale on PATH, and the app-bundle binary
+    when: the CLI path is resolved
+    then: config wins over PATH, PATH wins over the app bundle, and none gives the named message
+    oracle: resolve() returns config path, else PATH hit, else '/Applications/Tailscale.app/Contents/MacOS/Tailscale'; with
+      none it returns error 'Tailscale CLI not found. Install Tailscale or set tailscale_path in ~/.ccctl/config.toml.'
+    doubles: fake filesystem lookups
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-006-a
+    status: green
+  - id: SC-006-b
+    level: unit
+    title: Monitor interval and transitions
+    given: a monitor with default settings
+    when: backend states Running, Stopped, NeedsLogin, Running are observed
+    then: it binds on Running, unbinds on anything else, and uses a 10 second interval
+    oracle: default interval == 10s AND actions == [bind, unbind, (no-op), bind]
+    doubles: none; state machine
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-006-b
+    status: green
+  - id: SC-006-c
+    level: integration
+    title: Startup with Tailscale stopped
+    given: the fake Tailscale reports BackendState Stopped and the check interval is 100 ms
+    when: the controller starts, then the fake switches to Running
+    then: nothing listens and the message is logged and shown by ccctl status until Tailscale runs, then it binds
+    oracle: 'log and ''ccctl status'' output contain ''Tailscale is not running on this host. Start the Tailscale app or run:
+      sudo tailscale up. Retrying every 10 seconds.'' AND ccctl status exit code == 3 AND no listener before the switch AND
+      listener bound within 200 ms after it'
+    doubles: fake Tailscale status; injected interval
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/auth_test.go::SC-006-c
+    status: green
+  - id: SC-006-d
+    level: integration
+    title: Tailscale drop keeps sessions alive
+    given: a serving controller with 2 running sessions
+    when: the fake Tailscale switches to Stopped and then back to Running
+    then: the listener closes, tailscale_down is logged, sessions survive, and the listener returns
+    oracle: after the drop dialing the address fails AND a log line has event == tailscale_down AND both session PIDs are
+      alive AND after recovery dialing succeeds
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs; injected
+      interval
+    tags:
+    - go
+    test_ref: internal/tdd/auth_test.go::SC-006-d
+    status: green
+  - id: SC-006-e
+    level: unit
+    title: Reconnect backoff and banner text
+    given: a page whose WebSocket closes repeatedly for host mac-mini
+    when: 7 consecutive reconnect attempts fail
+    then: retry delays follow the schedule and the banner shows the host and the countdown
+    oracle: delays == [1,2,4,8,16,30,30] seconds AND banner text == 'Lost connection to mac-mini. Check that Tailscale is
+      on for this device and for mac-mini. Retrying in 1 s.' on the first attempt
+    doubles: fake timers; mock WebSocket
+    tags:
+    - vitest
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-006-e
+    status: green
+  - id: SC-006-f
+    level: acceptance
+    title: Banner appears when the controller goes away
+    given: the page is connected to a running controller
+    when: the controller process is stopped
+    then: the page shows the reconnect banner
+    oracle: text starting 'Lost connection to' and containing 'Check that Tailscale is on for this device' is visible within
+      3000 ms
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    negative: true
+    tags:
+    - playwright
+    test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-006-f
+    status: green
+  - id: SC-006-g
+    level: integration
+    title: A second controller refuses to start
+    given: a controller running for this user
+    when: a second ccctl serve starts with the same home
+    then: it refuses with the named message and leaves the first controller's hook socket in place
+    oracle: second Run returns 'ccctl is already running for this user. Stop it first (ccctl uninstall, or stop the other ccctl serve).' AND the first socket file still exists
+    doubles: fake Tailscale status and WhoIs
+    tags:
+    - go
+    - found-in-smoke-test
+    test_ref: internal/tdd/auth_test.go::SC-006-g
+    status: green
+  - id: SC-006-h
+    level: unit
+    title: Tailscale CLI runs in CLI mode under a service manager
+    given: launchd's minimal environment (HOME and PATH only), where the macOS app-bundle binary starts its GUI instead of the CLI
+    when: the controller builds the environment for a Tailscale CLI call
+    then: the environment forces CLI mode and keeps the inherited variables
+    oracle: env contains 'TAILSCALE_BE_CLI=1' AND the inherited HOME
+    doubles: none; pure function
+    tags:
+    - go
+    - found-on-mac-mini
+    test_ref: internal/tdd/unit_test.go::SC-006-h
+    status: green
+  - id: SC-006-i
+    level: unit
+    title: Page offers a reload when ccctl was upgraded
+    given: a page that received hello with version v0.1.1
+    when: it reconnects and gets v0.1.1 again, then v0.1.2
+    then: only the changed version shows the update banner with a Reload button
+    oracle: store.updated == false after the same version AND == true after v0.1.2 AND banner text contains 'ccctl on mac-mini was updated. Reload to use the new version'
+    doubles: none; store and component
+    tags:
+    - vitest
+    - found-on-mac-mini
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-006-i
+    status: green
+- id: REQ-007
+  text: At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited
+    and resume-failed panes count as free and are replaced without touching their worktrees.
+  priority: P0
+  type: functional
+  prd_ref: §5 story 5; DL-010; DL-016
+  scenarios:
+  - id: SC-007-a
+    level: unit
+    title: Slot allocation table
+    given: slot states combinations
+    when: the next slot is chosen
+    then: the lowest slot that is empty, exited or resume-failed is chosen; none when 4 are active
+    oracle: '[empty,run,run,run]->1; [run,run,run,exited]->4; [run,resume-failed,exited,run]->2; [run,starting,needs-input,run]->none'
+    doubles: none; pure function
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-007-a
+    status: green
+  - id: SC-007-b
+    level: integration
+    title: Fifth active launch is refused
+    given: 4 active sessions
+    when: a launch request arrives through the API
+    then: it is refused with 409 and nothing starts
+    oracle: status == 409 AND body contains 'All 4 slots are in use. Stop or close a session first.' AND fake claude invocation
+      count stays 4
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/launch_test.go::SC-007-b
+    status: green
+  - id: SC-007-c
+    level: integration
+    title: Exited pane is replaced and its worktree kept
+    given: 3 running sessions and slot 4 exited for task old-task with worktree W
+    when: a launch for task new-task is requested
+    then: the new session occupies slot 4 and W with branch ctl/old-task still exists
+    oracle: slot 4 task == new-task AND folder W exists AND git branch list contains ctl/old-task
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs; real git
+    tags:
+    - go
+    test_ref: internal/tdd/launch_test.go::SC-007-c
+    status: green
+  - id: SC-007-d
+    level: unit
+    title: New session control state
+    given: a session store with 4 active slots, and then 3 active plus 1 exited
+    when: the header renders
+    then: the control is disabled with the tooltip in the first case and enabled in the second
+    oracle: 'case 1: button.disabled == true AND title == ''All 4 slots are in use. Stop or close a session first.''; case
+      2: button.disabled == false'
+    doubles: mocked session store
+    tags:
+    - vitest
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-007-d
+    status: green
+- id: REQ-008
+  text: A pane shows Needs input within 2 seconds of Claude Code's Notification or Stop hook, the tab title counts such panes,
+    a single chime plays per transition unless muted, and any keystroke clears it.
+  priority: P1
+  type: functional
+  prd_ref: §5 story 6; A-002; A-016
+  scenarios:
+  - id: SC-008-a
+    level: unit
+    title: Generated hook settings
+    given: slot 2 and ccctl path C
+    when: the per-session settings file is generated
+    then: it registers Notification and Stop hooks that call ccctl hook for slot 2
+    oracle: JSON hooks.Notification[0].hooks[0].command == 'C hook --slot 2' AND the same for hooks.Stop
+    doubles: none; pure function
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-008-a
+    status: green
+  - id: SC-008-b
+    level: integration
+    title: Hook call flips the pane to needs-input
+    given: a running session in slot 2
+    when: '''ccctl hook --slot 2'' runs with a Notification payload on stdin'
+    then: slot 2 becomes needs-input, clients are told, and the event is logged
+    oracle: within 2000 ms slot 2 state == needs-input AND a WebSocket state frame {slot:2,state:'needs-input'} was sent AND
+      a log line has event == needs_input, hook == Notification
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs; real Unix
+      socket
+    tags:
+    - go
+    test_ref: internal/tdd/lifecycle_test.go::SC-008-b
+    status: green
+  - id: SC-008-c
+    level: integration
+    title: Keystroke clears needs-input
+    given: slot 2 in needs-input
+    when: an input frame for slot 2 arrives
+    then: slot 2 returns to running
+    oracle: slot 2 state == running after the frame
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/lifecycle_test.go::SC-008-c
+    status: green
+  - id: SC-008-d
+    level: unit
+    title: Title count and chime
+    given: the page with the chime unmuted
+    when: slots 1 and 3 enter needs-input, slot 1 re-reports needs-input, then the owner mutes and slot 2 enters needs-input
+    then: the title counts panes and the chime plays once per transition only while unmuted
+    oracle: document.title starts with '(2) ' then '(3) ' AND chime play count == 2 AND with zero needs-input panes the title
+      has no prefix
+    doubles: mock Audio; mocked session store
+    tags:
+    - vitest
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-008-d
+    status: green
+  - id: SC-008-e
+    level: acceptance
+    title: Needs-input badge appears
+    given: a running fake claude session in slot 1
+    when: the fake session invokes its Stop hook
+    then: pane 1's header shows the badge
+    oracle: pane 1 header shows text 'Needs input' within 2000 ms
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - playwright
+    test_ref: web/e2e/claude_code_controller.tdd.spec.ts::SC-008-e
+    status: green
+  - id: SC-008-f
+    level: integration
+    title: Automatic terminal replies do not clear needs-input
+    given: slot 2 in needs-input
+    when: the browser terminal sends focus-in (ESC [ I) and a cursor position report (ESC [ 12;40 R), then the owner types y
+    then: the replies leave needs-input set and only the keystroke clears it
+    oracle: slot 2 state == needs-input after the replies AND == running after 'y'
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    - found-in-smoke-test
+    test_ref: internal/tdd/lifecycle_test.go::SC-008-f
+    status: green
+- id: REQ-009
+  text: On startup the controller relaunches every session that was starting, running, or needs-input with claude --resume
+    in its original slot and folder before accepting connections; a resume that exits non-zero within 5 seconds shows resume-failed
+    with Start fresh and Close.
+  priority: P1
+  type: functional
+  prd_ref: §5 story 7; DL-013; DL-017; A-009; A-010
+  scenarios:
+  - id: SC-009-a
+    level: integration
+    title: Live sessions resume in place, others do not
+    given: state.json with slots 1-3 running (UUIDs U1-U3) and slot 4 exited
+    when: the controller starts
+    then: 3 processes are started with --resume in their original folders and slots, before the listener binds; slot 4 is
+      not relaunched
+    oracle: fake claude invocations == 3 with argv [claude_path, '--resume', Ui, '--dangerously-skip-permissions', '--settings',
+      Fi] and cwd == recorded cwd for slot i AND every spawn timestamp < listener bind timestamp AND no invocation for slot
+      4
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/lifecycle_test.go::SC-009-a
+    status: green
+  - id: SC-009-b
+    level: integration
+    title: Failed resume is reported
+    given: state.json with slot 1 running and a fake claude that exits with code 1 on --resume
+    when: the controller starts
+    then: slot 1 becomes resume-failed with the message and a log line
+    oracle: slot 1 state == resume-failed AND pane message == 'Could not resume TASK (exit code 1).' AND a log line has event
+      == resume_failed, exit_code == 1
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/lifecycle_test.go::SC-009-b
+    status: green
+  - id: SC-009-c
+    level: integration
+    title: Start fresh after a failed resume
+    given: slot 1 in resume-failed for task T in worktree W with UUID U
+    when: the owner triggers Start fresh
+    then: a new session starts in the same slot and folder with a new UUID and no --resume
+    oracle: new argv contains '--session-id' V with V != U AND argv lacks '--resume' AND cwd == W AND slot == 1 AND state.json
+      slot 1 session_id == V
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/lifecycle_test.go::SC-009-c
+    status: green
+  - id: SC-009-d
+    level: unit
+    title: State file durability and version guard
+    given: a state directory in a temp HOME
+    when: state is saved, and a file with version 2 is loaded
+    then: saves are atomic with mode 0600 and a newer version is refused
+    oracle: saved file mode == 0600 AND version == 1 AND a save interrupted before rename leaves the old file intact AND load(version
+      2) errors with 'State file version 2 is newer than this ccctl supports.'
+    doubles: real filesystem temp dir
+    negative: true
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-009-d
+    status: green
+- id: REQ-010
+  text: Stopping a session sends SIGHUP to its process group, then SIGKILL after 5 seconds; stopped or self-exited sessions
+    show the exited message and always keep their worktree and branch.
+  priority: P1
+  type: functional
+  prd_ref: §5 story 8; DL-012; A-009
+  scenarios:
+  - id: SC-010-a
+    level: integration
+    title: Stop escalates from SIGHUP to SIGKILL
+    given: one fake session that exits on SIGHUP and one that ignores SIGHUP, each in a worktree
+    when: both are stopped
+    then: the first exits on SIGHUP, the second is killed after 5 seconds, and both worktrees remain
+    oracle: fake 1 exit reason == SIGHUP AND fake 2 killed by SIGKILL between 5.0 s and 6.0 s after Stop AND both worktree
+      folders and ctl/ branches exist AND pane message == 'Exited (code N). Worktree kept at PATH on branch ctl/TASK.'
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs; real git
+    tags:
+    - go
+    test_ref: internal/tdd/lifecycle_test.go::SC-010-a
+    status: green
+  - id: SC-010-b
+    level: integration
+    title: Self-exit keeps the worktree
+    given: a fake session that exits with code 3 on its own
+    when: it exits
+    then: the pane shows exited with its code and the worktree remains
+    oracle: state == exited AND message == 'Exited (code 3). Worktree kept at W on branch ctl/TASK.' AND folder W exists
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/lifecycle_test.go::SC-010-b
+    status: green
+  - id: SC-010-c
+    level: unit
+    title: Stop confirmation
+    given: a running session for task fix-login
+    when: the owner presses Stop and then Cancel, and then Stop and Confirm
+    then: the dialog shows the spec text and only Confirm sends the stop request
+    oracle: dialog text == 'Stop fix-login? The worktree and branch are kept.' AND stop API calls == 0 after Cancel AND ==
+      1 after Confirm
+    doubles: mocked API
+    tags:
+    - vitest
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-010-c
+    status: green
+- id: REQ-011
+  text: Each session keeps the last 1 MiB of PTY output in memory and replays it to a connecting client before live output;
+    multiple tabs mirror all panes and a PTY's size follows the tab that most recently sent input.
+  priority: P1
+  type: functional
+  prd_ref: §5 story 9; A-003; A-004
+  scenarios:
+  - id: SC-011-a
+    level: unit
+    title: Ring buffer keeps the newest 1 MiB
+    given: an empty 1 MiB ring buffer
+    when: 1,048,586 bytes are written
+    then: the snapshot is the last 1,048,576 bytes
+    oracle: len(snapshot) == 1048576 AND snapshot == input[10:]
+    doubles: none; pure data structure
+    tags:
+    - go
+    test_ref: internal/tdd/unit_test.go::SC-011-a
+    status: green
+  - id: SC-011-b
+    level: integration
+    title: Replay precedes live output
+    given: a session that printed lines 1-100 while no client was connected
+    when: a client connects and the session prints line 101
+    then: the client receives 1-100 then 101 with nothing lost or reordered
+    oracle: received line numbers == [1..101] in order
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/io_test.go::SC-011-b
+    status: green
+  - id: SC-011-c
+    level: integration
+    title: Two tabs mirror; size follows last input
+    given: clients A (40x120) and B (30x100) connected to slot 1
+    when: A sends input, then B sends input
+    then: both see the same output and the PTY size follows the sender
+    oracle: A and B received identical slot 1 output bytes AND PTY size == 40x120 after A's input AND == 30x100 after B's
+      input
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/io_test.go::SC-011-c
+    status: green
+- id: REQ-012
+  text: ccctl install downloads the release binary for the host's OS and architecture, installs a launchd agent (KeepAlive
+    true) or systemd user unit (Restart=always), records claude_path, and ccctl status prints the controller URL.
+  priority: P1
+  type: functional
+  prd_ref: §5 story 10; DL-003; DL-014; A-017; A-022
+  scenarios:
+  - id: SC-012-a
+    level: unit
+    title: launchd agent rendering
+    given: binary path B
+    when: the macOS agent plist is rendered
+    then: it runs B serve and keeps it alive
+    oracle: parsed plist ProgramArguments == [B, 'serve'] AND KeepAlive == true
+    doubles: none; pure function
+    tags:
+    - go
+    test_ref: internal/tdd/install_test.go::SC-012-a
+    status: green
+  - id: SC-012-b
+    level: unit
+    title: systemd unit rendering
+    given: binary path B
+    when: the Linux user unit is rendered
+    then: it runs B serve and restarts always
+    oracle: unit has 'ExecStart=B serve' AND 'Restart=always'
+    doubles: none; pure function
+    tags:
+    - go
+    test_ref: internal/tdd/install_test.go::SC-012-b
+    status: green
+  - id: SC-012-c
+    level: unit
+    title: Release asset selection
+    given: release assets for darwin/linux x arm64/amd64
+    when: the asset is chosen for each GOOS/GOARCH pair and for windows/amd64, with and without --version v1.2.3
+    then: each supported pair maps to its asset, the requested tag is used, and windows is refused
+    oracle: 4 supported pairs map to 4 distinct assets AND --version v1.2.3 selects tag v1.2.3 AND windows/amd64 returns an
+      unsupported-platform error
+    doubles: release metadata fixture
+    tags:
+    - go
+    test_ref: internal/tdd/install_test.go::SC-012-c
+    status: green
+  - id: SC-012-d
+    level: unit
+    title: Install records claude_path and secures config
+    given: a PATH whose first claude is /h/.local/bin/claude
+    when: install writes the config
+    then: claude_path is the absolute path and the config is private
+    oracle: config claude_path == '/h/.local/bin/claude' AND config file mode == 0600
+    doubles: fake PATH; temp HOME
+    tags:
+    - go
+    test_ref: internal/tdd/install_test.go::SC-012-d
+    status: green
+  - id: SC-012-e
+    level: acceptance
+    title: Install on mac-mini
+    given: a merged release and mac-mini with Tailscale running
+    when: the owner runs ccctl install and then ccctl status on mac-mini
+    then: the launchd agent is loaded and the status shows the URL
+    oracle: ccctl status prints 'http://100.82.27.73:7681' AND launchctl list contains the ccctl agent
+    tags:
+    - manual
+    status: red
+  - id: SC-012-f
+    level: acceptance
+    title: Crash recovery under the service manager
+    given: the installed service on mac-mini with 2 running sessions
+    when: the controller process is killed with SIGKILL
+    then: the service is serving again and the sessions resumed
+    oracle: HTTP on the controller URL answers within 10 s of the kill AND both slots show resumed sessions
+    tags:
+    - nfr
+    - manual
+    status: red
+- id: REQ-013
+  text: 'Non-functional budgets from §13 hold: controller-added latency p95 <= 20 ms with 4 busy sessions, controller RSS
+    <= 150 MB, page first load <= 2 s over the tailnet, binary <= 30 MB per platform.'
+  priority: P2
+  type: non-functional
+  prd_ref: §13 (no priority stated; artifact default P2)
+  scenarios:
+  - id: SC-013-a
+    level: integration
+    title: Controller-added output latency
+    given: 4 fake sessions printing continuously and one WebSocket client
+    when: 10,000 output chunks are timestamped at PTY read and at WebSocket write
+    then: the p95 delta is within budget
+    oracle: p95(ws_write_ts - pty_read_ts) <= 20 ms
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - nfr
+    - go
+    test_ref: internal/tdd/io_test.go::SC-013-a
+    status: green
+  - id: SC-013-b
+    level: acceptance
+    title: Controller memory ceiling
+    given: 4 sessions each with a full 1 MiB scrollback buffer on mac-mini
+    when: ps reports the controller's resident memory
+    then: memory is within budget
+    oracle: RSS of the ccctl process (excluding claude processes) <= 150 MB
+    tags:
+    - nfr
+    - manual
+    status: red
+  - id: SC-013-c
+    level: acceptance
+    title: Page first load
+    given: the controller on mac-mini and a desktop browser on yonis-macbook-pro
+    when: the page is loaded with a cold cache
+    then: load completes within budget
+    oracle: performance timeline loadEventEnd <= 2000 ms
+    tags:
+    - nfr
+    - manual
+    status: red
+  - id: SC-013-d
+    level: integration
+    title: Binary size per platform
+    given: a GoReleaser snapshot build
+    when: binaries for the 4 platforms are measured
+    then: each is within budget
+    oracle: size of each of the 4 binaries <= 31,457,280 bytes
+    doubles: real build
+    tags:
+    - nfr
+    - ci
+    - go
+    test_ref: internal/tdd/io_test.go::SC-013-d
+    status: green
+- id: REQ-014
+  text: session_started and session_exited are written as JSON log lines with the §9 properties.
+  priority: P2
+  type: functional
+  prd_ref: §9 (no priority stated; artifact default P2)
+  scenarios:
+  - id: SC-014-a
+    level: integration
+    title: Session lifecycle log lines
+    given: an empty log and a launch of task fix-login followed by Stop
+    when: the session starts and is stopped
+    then: one started and one exited line are written with every §9 property
+    oracle: log has event == session_started with keys slot, task, cwd, worktree, branch, session_id, resumed == false AND
+      event == session_exited with keys slot, task, exit_code, duration_s, stopped_by_user == true
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/lifecycle_test.go::SC-014-a
+    status: green
+- id: REQ-015
+  text: The owner sets session environment variables (for example CLAUDE_CODE_OAUTH_TOKEN) from a Settings panel; values are write-only, stored in config.toml with mode 0600, never logged, and reach sessions launched afterwards.
+  priority: P1
+  type: functional
+  prd_ref: §15 DL-018; §12 env
+  scenarios:
+  - id: SC-015-a
+    level: integration
+    title: Settings API is write-only and reaches sessions
+    given: config.toml with claude_path only
+    when: the page PUTs CLAUDE_CODE_OAUTH_TOKEN, lists names, tries reserved and cross-origin writes, launches a session, then DELETEs the variable
+    then: only names are ever returned, the file stays 0600 with other keys kept, reserved and cross-origin writes are refused, the session gets the value, and the log never contains it
+    oracle: PUT and GET bodies lack the value AND mode == 0600 AND claude_path kept AND PUT CCCTL_SOCK/PATH/1BAD == 400 AND cross-origin or Origin-less PUT == 403 AND session env has CLAUDE_CODE_OAUTH_TOKEN=value AND log lacks the value AND 2 settings_env_changed events
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - go
+    test_ref: internal/tdd/launch_test.go::SC-015-a
+    status: green
+  - id: SC-015-b
+    level: unit
+    title: Settings dialog never shows a saved value and confirms removal
+    given: a dialog listing GEMINI_API_KEY
+    when: the owner saves CLAUDE_CODE_OAUTH_TOKEN, then presses Remove on GEMINI_API_KEY and confirms
+    then: the value field is a cleared password field and the value never appears in the DOM; removal waits for confirmation
+    oracle: input type == password AND body HTML lacks the value after save AND input value == '' AND envRemove not called before confirm AND called with GEMINI_API_KEY after
+    doubles: mocked API
+    tags:
+    - vitest
+    test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-015-b
+    status: green
