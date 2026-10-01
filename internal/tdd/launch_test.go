@@ -3,6 +3,7 @@ package tdd
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ryabinski-labs/claude-code-controller/internal/config"
 	"github.com/ryabinski-labs/claude-code-controller/internal/session"
 	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
 )
@@ -132,19 +134,20 @@ func launchN(h *tu.H, n int) []string {
 	return dirs
 }
 
-// SC-007-b
+// SC-007-b: with every slot active (config.MaxSessions), one more launch is refused.
 func TestSc007BFifthActiveLaunchIsRefused(t *testing.T) {
 	h := tu.Start(t, tu.Opts{})
-	launchN(h, 4)
-	tu.Eventually(t, 5*time.Second, func() bool { return len(h.Invocations()) == 4 }, "4 sessions did not start")
-	d := filepath.Join(h.Root, "five")
+	max := config.MaxSessions
+	launchN(h, max)
+	tu.Eventually(t, 10*time.Second, func() bool { return len(h.Invocations()) == max }, "all sessions did not start")
+	d := filepath.Join(h.Root, "extra")
 	os.MkdirAll(d, 0o755)
-	code, body := h.Do("POST", "/api/sessions", session.LaunchRequest{Task: "five", Path: d})
-	if code != 409 || !strings.Contains(string(body), "All 4 slots are in use. Stop or close a session first.") {
+	code, body := h.Do("POST", "/api/sessions", session.LaunchRequest{Task: "extra", Path: d})
+	if want := fmt.Sprintf("All %d slots are in use. Stop or close a session first.", max); code != 409 || !strings.Contains(string(body), want) {
 		t.Fatalf("got %d %s", code, body)
 	}
 	time.Sleep(300 * time.Millisecond)
-	if n := len(h.Invocations()); n != 4 {
+	if n := len(h.Invocations()); n != max {
 		t.Fatalf("invocations = %d", n)
 	}
 }

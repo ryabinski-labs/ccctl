@@ -63,7 +63,7 @@ async function startController(args: string[]): Promise<Controller> {
 }
 
 export const test = base.extend<{ controller: Controller; serverArgs: string[] }>({
-  serverArgs: [['--slots-folders', '4'], { option: true }],
+  serverArgs: [['--slots-folders', '6'], { option: true }],
   controller: async ({ serverArgs }, use) => {
     const ctl = await startController(serverArgs);
     await use(ctl);

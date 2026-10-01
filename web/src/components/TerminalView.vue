@@ -121,7 +121,7 @@ onMounted(async () => {
   }
 
   term.attachCustomKeyEventHandler((e) => {
-    if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && /^(Digit[0-4]|KeyM)$/.test(e.code)) {
+    if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && /^(Digit[0-6]|KeyM)$/.test(e.code)) {
       e.preventDefault();
       emit('shortcut', e);
       return false;

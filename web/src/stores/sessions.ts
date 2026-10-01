@@ -25,9 +25,9 @@ export const useSessions = defineStore('sessions', {
   state: () => ({
     host: typeof location !== 'undefined' ? location.hostname : '',
     login: '',
-    slots: [null, null, null, null] as (SlotInfo | null)[],
+    slots: Array.from({ length: MAX_SESSIONS }, () => null) as (SlotInfo | null)[],
     /** true once the slot's current session produced output (hides the Starting overlay). */
-    hasOutput: [false, false, false, false] as boolean[],
+    hasOutput: Array.from({ length: MAX_SESSIONS }, () => false) as boolean[],
     connected: false,
     /** true after a connection attempt failed or dropped; drives the reconnect banner. */
     lost: false,

@@ -11,8 +11,8 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// MaxSessions is fixed at 4 (DL-010).
-const MaxSessions = 4
+// MaxSessions is the number of terminal slots (up to six; was four in DL-010).
+const MaxSessions = 6
 
 // DefaultPort is the controller port (A-005).
 const DefaultPort = 7681

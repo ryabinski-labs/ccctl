@@ -192,7 +192,8 @@ func TestSc007ASlotAllocationTable(t *testing.T) {
 	for _, c := range []struct {
 		in   []session.State
 		want int
-	}{{[]session.State{e, r, r, r}, 1}, {[]session.State{r, r, r, x}, 4}, {[]session.State{r, f, x, r}, 2}, {[]session.State{r, s, n, r}, 0}} {
+	}{{[]session.State{e, r, r, r}, 1}, {[]session.State{r, r, r, x}, 4}, {[]session.State{r, f, x, r}, 2}, {[]session.State{r, s, n, r}, 0},
+		{[]session.State{r, r, r, r, r, e}, 6}, {[]session.State{r, r, r, r, r, r}, 0}, {[]session.State{r, r, r, r, x, r}, 5}} {
 		if got := session.NextSlot(c.in); got != c.want {
 			t.Errorf("NextSlot(%v) = %d; want %d", c.in, got, c.want)
 		}

@@ -15,15 +15,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ryabinski-labs/claude-code-controller/internal/config"
 	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
 )
 
 // SC-004-b
 func TestSc004BInputBytesRouteExactlyToOnePty(t *testing.T) {
 	h := tu.Start(t, tu.Opts{})
-	launchN(h, 4)
+	launchN(h, config.MaxSessions)
 	ws := h.Dial()
-	for s := 1; s <= 4; s++ {
+	for s := 1; s <= config.MaxSessions; s++ {
 		ws.WaitOutput(s, "FAKE_CLAUDE", 5*time.Second)
 	}
 	for _, in := range []string{"hello\r", "\x1b", "\x03", "\x1b[A"} {
@@ -32,7 +33,7 @@ func TestSc004BInputBytesRouteExactlyToOnePty(t *testing.T) {
 	want := "68656c6c6f0d" + "1b" + "03" + "1b5b41"
 	tu.Eventually(t, 2*time.Second, func() bool { return hex.EncodeToString(h.InputLog(2)) == want }, "slot 2 bytes = "+hex.EncodeToString(h.InputLog(2)))
 	time.Sleep(500 * time.Millisecond)
-	for _, s := range []int{1, 3, 4} {
+	for _, s := range []int{1, 3, 4, 5, 6} {
 		if b := h.InputLog(s); len(b) != 0 {
 			t.Errorf("slot %d read %q", s, b)
 		}
@@ -45,11 +46,11 @@ var lineRe = regexp.MustCompile(`slot=(\d) line=(\d+)`)
 func TestSc004COutputFanOutKeepsPerSlotOrder(t *testing.T) {
 	h := tu.Start(t, tu.Opts{Mode: "lines=1000"})
 	ws := h.Dial()
-	launchN(h, 4)
-	for s := 1; s <= 4; s++ {
+	launchN(h, config.MaxSessions)
+	for s := 1; s <= config.MaxSessions; s++ {
 		ws.WaitOutput(s, fmt.Sprintf("slot=%d line=1000\r\n", s), 10*time.Second)
 	}
-	for s := 1; s <= 4; s++ {
+	for s := 1; s <= config.MaxSessions; s++ {
 		var nums []int
 		for _, m := range lineRe.FindAllStringSubmatch(ws.Output(s), -1) {
 			if m[1] != strconv.Itoa(s) {
@@ -138,9 +139,9 @@ func TestSc013AControllerAddedOutputLatency(t *testing.T) {
 	}
 	h := tu.Start(t, tu.Opts{Mode: "ticker=2500"})
 	ws := h.Dial()
-	launchN(h, 4)
+	launchN(h, config.MaxSessions)
 	tu.Eventually(t, 30*time.Second, func() bool {
-		for s := 1; s <= 4; s++ {
+		for s := 1; s <= config.MaxSessions; s++ {
 			if !strings.Contains(ws.Output(s), " 2500\r\n") {
 				return false
 			}

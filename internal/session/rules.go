@@ -8,15 +8,19 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/ryabinski-labs/claude-code-controller/internal/config"
 )
 
 // Spec messages (§5), verbatim.
 const (
 	MsgTaskName   = "Task name must be 1 to 40 characters of a-z, 0-9 or -, and unique among open sessions."
-	MsgAllInUse   = "All 4 slots are in use. Stop or close a session first."
 	MsgNotGitRepo = "Not a git repository: session runs in the folder itself."
 	MaxPromptLen  = 10000
 )
+
+// MsgAllInUse is the launch refusal when every slot is active.
+var MsgAllInUse = fmt.Sprintf("All %d slots are in use. Stop or close a session first.", config.MaxSessions)
 
 func MsgBadPath(p string) string { return fmt.Sprintf("Path %s does not exist or is not a folder.", p) }
 func MsgWorktreeExists(task string) string {

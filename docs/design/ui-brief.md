@@ -1,10 +1,10 @@
 # ccctl UI brief (ui-ux-cx-engineer)
 
-**User and job.** One developer supervising up to four Claude Code agents from another desktop.
-Top task: glance at four panes, spot the one waiting on them, type into exactly that one.
+**User and job.** One developer supervising up to six Claude Code agents from another desktop.
+Top task: glance at the open panes, spot the one waiting on them, type into exactly that one.
 Second: start a session in a free slot. Failure that matters most: typing into the wrong pane.
 
-**Direction — "control room on paper".** Light, warm chrome (house rule: light theme) around four
+**Direction — "control room on paper".** Light, warm chrome (house rule: light theme) around up to six
 dark terminal "monitors". The contrast makes occupancy readable at a glance: a live slot is a dark
 well; a free slot is a light dashed card. Claude Code's TUI is designed for a dark background, so
 the terminal wells stay dark.
@@ -19,7 +19,7 @@ the terminal wells stay dark.
 
 **Header.** `ccctl` wordmark · host name (mono) with connection dot · summary ("3 running · 1 needs
 input") · toggles: Screen reader mode, Chime on/off (icon + text) · primary **New session** (disabled
-with title `All 4 slots are in use. Stop or close a session first.` when 4 active).
+with title `All 6 slots are in use. Stop or close a session first.` when 6 active).
 
 **Pane.** Header: slot chip `1`, task (mono, semibold), `repo · ctl/branch` (muted, ellipsis),
 state badge (dot + text: Starting / Running / Needs input / Exited / Resume failed), icon buttons
@@ -54,7 +54,7 @@ live region announces only the first message.
 **Alerts.** Tab title `(N) ccctl · HOST` when N panes need input. One soft two-tone WebAudio chime
 per transition into needs-input, unless muted (mute persisted in localStorage).
 
-**Keyboard (WCAG 2.1.2 — terminals capture Tab).** `Ctrl+Shift+1..4` focus pane N;
+**Keyboard (WCAG 2.1.2 — terminals capture Tab).** `Ctrl+Shift+1..6` focus pane N;
 `Ctrl+Shift+0` leave terminals to the header; `Ctrl+Shift+M` maximize/restore focused pane.
 Shown in a "Keys" popover in the header. Every chrome control keyboard-reachable with a visible
 2px focus ring. State changes announced through one `aria-live="polite"` region
