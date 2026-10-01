@@ -223,7 +223,7 @@ type Options struct {
 	LookPath func(string) (string, error)
 	HTTP     *http.Client
 	APIBase  string // default https://api.github.com
-	Token    string // default $GITHUB_TOKEN, else `gh auth token`
+	Token    string // optional; default $GITHUB_TOKEN, else `gh auth token`, else anonymous
 	Env      func(string) string
 	UID      int
 	Out      io.Writer
@@ -391,32 +391,33 @@ func Uninstall(ctx context.Context, o Options) error {
 	return nil
 }
 
-func token(ctx context.Context, o *Options) (string, error) {
+// token returns a GitHub token if one is available. The release repo is public,
+// so a missing token is fine: downloads go anonymously, at GitHub's lower rate limit.
+func token(ctx context.Context, o *Options) string {
 	if o.Token != "" {
-		return o.Token, nil
+		return o.Token
 	}
 	if t := o.Env("GITHUB_TOKEN"); t != "" {
-		return t, nil
+		return t
 	}
 	out, err := o.Run(ctx, "gh", "auth", "token")
 	if err != nil {
-		return "", errors.New("no GitHub token: set GITHUB_TOKEN or log in with `gh auth login` (the release repo is private)")
+		return ""
 	}
-	return strings.TrimSpace(string(out)), nil
+	return strings.TrimSpace(string(out))
 }
 
 func download(ctx context.Context, o *Options, dest string) (string, error) {
-	tok, err := token(ctx, o)
-	if err != nil {
-		return "", err
-	}
+	tok := token(ctx, o)
 	get := func(url, accept string) (*http.Response, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return nil, err
 		}
 		req.Header.Set("Accept", accept)
-		req.Header.Set("Authorization", "Bearer "+tok)
+		if tok != "" {
+			req.Header.Set("Authorization", "Bearer "+tok)
+		}
 		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 		resp, err := o.HTTP.Do(req)
 		if err != nil {

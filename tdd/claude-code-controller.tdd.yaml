@@ -299,7 +299,7 @@ requirements:
   - id: SC-004-f
     level: acceptance
     title: End-to-end output latency over the tailnet
-    given: the controller on mac-mini with 4 busy sessions and the page open on yonis-macbook-pro
+    given: the controller on mac-mini with 4 busy sessions and the page open on laptop
     when: 200 timestamped echo samples are sent through pane 1
     then: the p95 output-to-render latency is within budget
     oracle: p95(render_time - send_time) over 200 samples <= 250 ms
@@ -900,7 +900,7 @@ requirements:
     given: a merged release and mac-mini with Tailscale running
     when: the owner runs ccctl install and then ccctl status on mac-mini
     then: the launchd agent is loaded and the status shows the URL
-    oracle: ccctl status prints 'http://100.82.27.73:7681' AND launchctl list contains the ccctl agent
+    oracle: ccctl status prints 'http://100.64.0.10:7681' AND launchctl list contains the ccctl agent
     tags:
     - manual
     status: red
@@ -949,7 +949,7 @@ requirements:
   - id: SC-013-c
     level: acceptance
     title: Page first load
-    given: the controller on mac-mini and a desktop browser on yonis-macbook-pro
+    given: the controller on mac-mini and a desktop browser on laptop
     when: the page is loaded with a cold cache
     then: load completes within budget
     oracle: performance timeline loadEventEnd <= 2000 ms

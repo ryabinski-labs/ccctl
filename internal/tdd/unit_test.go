@@ -110,12 +110,12 @@ func TestSc005AAuthorizationDecisionTable(t *testing.T) {
 
 // SC-005-f
 func TestSc005FDefaultAllowlistIsTheHostNodeSLogin(t *testing.T) {
-	fixture := `{"BackendState":"Running","Self":{"UserID":42,"HostName":"mac-mini","DNSName":"mac-mini.tail.ts.net.","TailscaleIPs":["100.82.27.73","fd7a::1"]},"User":{"42":{"LoginName":"owner@example"}}}`
+	fixture := `{"BackendState":"Running","Self":{"UserID":42,"HostName":"mac-mini","DNSName":"mac-mini.tail.ts.net.","TailscaleIPs":["100.64.0.10","fd7a::1"]},"User":{"42":{"LoginName":"owner@example"}}}`
 	st, err := tailscale.ParseStatus([]byte(fixture))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.IPv4 != "100.82.27.73" {
+	if st.IPv4 != "100.64.0.10" {
 		t.Errorf("IPv4 = %q", st.IPv4)
 	}
 	home := t.TempDir()
@@ -136,13 +136,13 @@ func TestSc005GWhoisResultsCached60SecondsPerAddress(t *testing.T) {
 	c.Now = func() time.Time { return now }
 	for _, at := range []time.Duration{0, 59 * time.Second} {
 		now = time.Unix(0, 0).Add(at)
-		c.Login(context.Background(), "100.66.98.34:51000")
+		c.Login(context.Background(), "100.64.0.20:51000")
 	}
 	if calls != 1 {
 		t.Fatalf("calls after t=59s = %d", calls)
 	}
 	now = time.Unix(61, 0)
-	c.Login(context.Background(), "100.66.98.34:51001")
+	c.Login(context.Background(), "100.64.0.20:51001")
 	if calls != 2 {
 		t.Fatalf("calls after t=61s = %d", calls)
 	}

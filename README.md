@@ -1,11 +1,53 @@
-# claude-code-controller (`ccctl`)
+# ccctl: claude-code-controller
 
-A web controller for up to 4 live Claude Code sessions on one host, reached over Tailscale.
-Open `http://TAILSCALE_IP:7681/` from any device on your tailnet to get a 2x2 grid of real
-`claude` terminals. You can watch all four, type into any of them, and see which one is
-waiting for you.
+**ccctl is a web controller for up to four live [Claude Code](https://docs.claude.com/en/docs/claude-code) sessions on one machine, reached privately over Tailscale.**
 
-- **Spec:** `docs/prd/claude-code-controller.md`
+> Unofficial community project. It is not affiliated with, endorsed by, or sponsored by Anthropic. "Claude" and "Claude Code" are trademarks of Anthropic.
+
+ccctl is built for developers who run several Claude Code sessions in parallel on an always-on Mac or Linux host. Open `http://TAILSCALE_IP:7681/` from any device on your tailnet and get a 2x2 grid of real `claude` terminals. The problem it solves: a session blocked on a prompt in a terminal you are not looking at. You watch all four, type into any of them, and see at a glance which one is waiting for you.
+
+## At a glance
+
+| | |
+|---|---|
+| **What it is** | One Go binary (`ccctl`) with an embedded Vue 3 + xterm.js web UI, run as a background service on the host that runs Claude Code. |
+| **Who it is for** | People who run several Claude Code sessions in parallel on a Mac or Linux box (a Mac mini, a home server) and want to check on them from a laptop, tablet, or phone. |
+| **Problem it solves** | Parallel agent sessions sit blocked on a prompt in a terminal you are not looking at. ccctl shows all of them in one page and flags the one that needs you: an amber pane header, a tab-title count, and an optional chime. |
+| **Outcome** | Start, watch, and answer up to four sessions from any device on your tailnet, with each task isolated in its own git worktree. |
+| **Status** | Early (`v0.1.x`). Used daily by its author. Expect rough edges and breaking changes. |
+| **Platforms** | Host: macOS or Linux, arm64 or amd64. Viewer: any modern browser on your tailnet. |
+| **License** | [MIT](LICENSE) |
+
+### Use it when
+
+- Claude Code is installed and logged in on one always-on machine, and you want to drive it from other devices.
+- You already use Tailscale, and "reachable only on my tailnet" is the access model you want.
+
+### Do not use it when
+
+- You need to expose sessions to the public internet, other tailnets, or people you do not trust. Every session runs with `--dangerously-skip-permissions`, so anyone with access controls your machine. See [Security notes](#security-notes).
+- You need TLS, per-session permissions, or more than four sessions. None of these exist.
+- You want a hosted service or multi-user product. ccctl is a single-user tool.
+
+Related tools: `tmux` or `screen` over SSH (no status view), and the Claude Code desktop and web apps (hosted by Anthropic, not on your own machine).
+
+## Quickstart
+
+On the host (the machine that runs Claude Code), with Tailscale running and `claude` logged in:
+
+```sh
+# Pick your platform: ccctl_{darwin,linux}_{arm64,amd64}.tar.gz
+curl -fsSL -O https://github.com/ryabinski-labs/claude-code-controller/releases/latest/download/ccctl_darwin_arm64.tar.gz
+tar xzf ccctl_darwin_arm64.tar.gz ccctl
+./ccctl install
+~/.ccctl/bin/ccctl status
+```
+
+Expected result: `ccctl status` prints the controller URL, for example `http://100.64.0.10:7681`. Open it from any device on your tailnet. On macOS, read [macOS firewall](#macos-firewall) if the page never loads.
+
+## Documentation
+
+- **Spec:** `docs/prd/claude-code-controller.md` (a historical design record)
 - **TDD artifact:** `tdd/claude-code-controller.tdd.yaml`
 - **UI brief:** `docs/design/ui-brief.md`
 - **Wire protocol:** `docs/design/protocol.md`
@@ -20,22 +62,19 @@ waiting for you.
 
 ## Install
 
-You need Tailscale running on the host and on the viewing device, Claude Code installed and logged in on the host, and git 2.20 or newer.
+### Requirements
 
-For the first install, download a release binary. The repo is private, so use `gh`:
+Tailscale running on the host and on the viewing device, Claude Code installed and logged in on the host, and git 2.20 or newer. Linux hosts need systemd user services.
 
-```sh
-gh release download --repo ryabinski-labs/claude-code-controller --pattern 'ccctl_darwin_arm64.tar.gz'
-tar xzf ccctl_darwin_arm64.tar.gz ccctl
-./ccctl install          # downloads the latest release into ~/.ccctl/bin and starts the service
-~/.ccctl/bin/ccctl status
-```
+### Install
 
-Pick the archive that matches the host: `ccctl_{darwin,linux}_{arm64,amd64}.tar.gz`.
+Download a release binary as shown in the [Quickstart](#quickstart), then run `ccctl install`. To check the download first, compare it against `checksums.txt` on the release page, or verify its build provenance with `gh attestation verify ccctl_darwin_arm64.tar.gz --repo ryabinski-labs/claude-code-controller`.
+
+The macOS binaries are not signed or notarized. Downloading with `curl`, as above, avoids the Gatekeeper quarantine prompt that a browser download triggers.
 
 `ccctl install` does the following:
 
-1. Downloads the latest release, or the tag given with `--version vX.Y.Z`, using `$GITHUB_TOKEN` or `gh auth token`. With `--local`, it copies the running binary instead of downloading.
+1. Downloads the latest release, or the tag given with `--version vX.Y.Z`, anonymously, or with `$GITHUB_TOKEN` or `gh auth token` when one is available (this avoids GitHub's lower anonymous rate limit). With `--local`, it copies the running binary instead of downloading.
 2. Records the absolute path of `claude` from your shell as `claude_path`. launchd and systemd do not load your shell `PATH`.
 3. Writes the service and starts it:
    - **macOS:** a launchd user agent `~/Library/LaunchAgents/com.ryabinski-labs.ccctl.plist` with `KeepAlive`.
@@ -120,8 +159,19 @@ npm --prefix web test                 # Vitest
 npm --prefix web run e2e              # Playwright, headless Chromium only
 ```
 
-Test names carry scenario IDs (`SC-xxx-y`) from the TDD artifact. The manual scenarios (latency over the tailnet, install on mac-mini, crash recovery, memory, first load) are run by hand on the host.
+Test names carry scenario IDs (`SC-xxx-y`) from the TDD artifact. The manual scenarios (latency over the tailnet, install on a real host, crash recovery, memory, first load) are run by hand on the host.
 
 ## Release
 
-CI runs on the org's self-hosted Linux runners. Each merge to `main` tags `v0.1.<run>` and publishes darwin and linux binaries for arm64 and amd64 with GoReleaser. Releases are never deleted.
+CI runs on GitHub-hosted Linux runners. Each merge to `main` tags `v0.1.<run>` and publishes darwin and linux binaries for arm64 and amd64 with GoReleaser, plus `checksums.txt` and a build-provenance attestation. Releases are never deleted.
+
+## Contributing, support, security
+
+- **Contribute:** see [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and focused pull requests are welcome.
+- **Get help:** see [SUPPORT.md](SUPPORT.md). This is a volunteer project with no response-time guarantee.
+- **Report a vulnerability:** privately, as described in [SECURITY.md](SECURITY.md).
+- **Maintainers:** [MAINTAINERS.md](MAINTAINERS.md). **Conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Yoni Ryabinski. Third-party components keep their own licenses; see their packages.

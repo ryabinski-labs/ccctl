@@ -1,0 +1,12 @@
+# CODEOWNERS documents who owns sensitive areas. Merging is gated by CI and
+# maintainer-only permissions, not by required code-owner review.
+
+*                           @cigan1
+/.github/                   @cigan1
+/internal/auth/             @cigan1
+/internal/install/          @cigan1
+/internal/tailscale/        @cigan1
+/.goreleaser.yaml           @cigan1
+/SECURITY.md                @cigan1
+/MAINTAINERS.md             @cigan1
+/LICENSE                    @cigan1

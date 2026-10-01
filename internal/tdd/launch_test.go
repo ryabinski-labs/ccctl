@@ -211,12 +211,12 @@ func TestSc015ASettingsPanelEnvIsWriteOnlyAndReachesSessions(t *testing.T) {
 	h := tu.Start(t, tu.Opts{})
 	cfgPath := filepath.Join(h.Home, ".ccctl", "config.toml")
 	os.WriteFile(cfgPath, []byte("claude_path = \"/keep/me\"\n"), 0o600)
-	const secret = "sk-ant-oat01-SECRET"
-	code, body := h.Do("PUT", "/api/settings/env/CLAUDE_CODE_OAUTH_TOKEN", map[string]string{"value": secret})
-	if code != 200 || strings.Contains(string(body), secret) || !strings.Contains(string(body), "CLAUDE_CODE_OAUTH_TOKEN") {
+	const canary = "sk-ant-oat01-CANARY"
+	code, body := h.Do("PUT", "/api/settings/env/CLAUDE_CODE_OAUTH_TOKEN", map[string]string{"value": canary})
+	if code != 200 || strings.Contains(string(body), canary) || !strings.Contains(string(body), "CLAUDE_CODE_OAUTH_TOKEN") {
 		t.Fatalf("PUT = %d %s", code, body)
 	}
-	if _, b := h.Do("GET", "/api/settings/env", nil); strings.Contains(string(b), secret) || !strings.Contains(string(b), `"CLAUDE_CODE_OAUTH_TOKEN"`) {
+	if _, b := h.Do("GET", "/api/settings/env", nil); strings.Contains(string(b), canary) || !strings.Contains(string(b), `"CLAUDE_CODE_OAUTH_TOKEN"`) {
 		t.Fatalf("list = %s", b)
 	}
 	fi, _ := os.Stat(cfgPath)
@@ -246,13 +246,13 @@ func TestSc015ASettingsPanelEnvIsWriteOnlyAndReachesSessions(t *testing.T) {
 	for _, e := range h.Invocations()[0]["env"].([]any) {
 		env = append(env, e.(string))
 	}
-	if !slices.Contains(env, "CLAUDE_CODE_OAUTH_TOKEN="+secret) {
+	if !slices.Contains(env, "CLAUDE_CODE_OAUTH_TOKEN="+canary) {
 		t.Fatal("session did not get the token")
 	}
 	if code, b := h.Do("DELETE", "/api/settings/env/CLAUDE_CODE_OAUTH_TOKEN", nil); code != 200 || strings.Contains(string(b), "CLAUDE_CODE_OAUTH_TOKEN") {
 		t.Fatalf("DELETE = %d %s", code, b)
 	}
-	if strings.Contains(h.Log.String(), secret) || len(h.Log.Events("settings_env_changed")) != 2 {
+	if strings.Contains(h.Log.String(), canary) || len(h.Log.Events("settings_env_changed")) != 2 {
 		t.Fatalf("log leaked the value or missed events")
 	}
 }
