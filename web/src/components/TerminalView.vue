@@ -8,9 +8,17 @@ import '@xterm/xterm/css/xterm.css';
 import { terminalBus, type TerminalSink } from '../lib/terminalBus';
 import { useSessions } from '../stores/sessions';
 import { copyText, parseOsc52 } from '../lib/clipboard';
+import { filesOf, uploadForPaste } from '../lib/attach';
+import { ApiError } from '../lib/api';
 
 const props = defineProps<{ slot: number }>();
-const emit = defineEmits<{ focus: []; blur: []; shortcut: [e: KeyboardEvent] }>();
+const emit = defineEmits<{
+  focus: [];
+  blur: [];
+  shortcut: [e: KeyboardEvent];
+  /** Upload progress: busy while files are going up; error is set when one fails. */
+  attach: [state: { busy: boolean; error: string }];
+}>();
 
 const store = useSessions();
 const host = ref<HTMLElement | null>(null);
@@ -141,6 +149,41 @@ onMounted(async () => {
   };
   host.value.addEventListener('pointerup', flushCopy);
   host.value.addEventListener('keydown', flushCopy);
+  // Files pasted or dropped on the pane go to the host, and their paths are
+  // typed into the session (Claude Code attaches an image given by path).
+  // Plain-text paste is left to xterm.
+  async function attach(files: File[]) {
+    if (!term || files.length === 0) return;
+    emit('attach', { busy: true, error: '' });
+    try {
+      const text = await uploadForPaste(props.slot, files);
+      term?.paste(text);
+      emit('attach', { busy: false, error: '' });
+    } catch (e) {
+      emit('attach', { busy: false, error: e instanceof ApiError ? e.message : 'The upload did not reach the controller. Try again.' });
+    }
+  }
+  host.value.addEventListener(
+    'paste',
+    (e) => {
+      const files = filesOf(e.clipboardData);
+      if (files.length === 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void attach(files);
+    },
+    true,
+  );
+  host.value.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+  });
+  host.value.addEventListener('drop', (e) => {
+    const files = filesOf(e.dataTransfer);
+    if (files.length === 0) return;
+    e.preventDefault();
+    void attach(files);
+    term?.focus();
+  });
   term.onData((d) => store.sendInput(props.slot, encoder.encode(d)));
   term.onBinary((d) => {
     const bytes = new Uint8Array(d.length);
@@ -155,6 +198,7 @@ onMounted(async () => {
     reset: () => term?.reset(),
     focus: () => term?.focus(),
     text: bufferText,
+    attach: (files) => void attach(files),
   };
   terminalBus.register(props.slot, sink);
 

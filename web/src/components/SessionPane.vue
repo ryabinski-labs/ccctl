@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { terminalBus } from '../lib/terminalBus';
 import { api, ApiError } from '../lib/api';
 import { handleShortcut } from '../lib/shortcuts';
 import { TEXT } from '../lib/types';
@@ -53,6 +54,26 @@ async function closePane() {
   });
 }
 
+const fileInput = ref<HTMLInputElement | null>(null);
+const uploading = ref(false);
+let errorTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onAttach(s: { busy: boolean; error: string }) {
+  uploading.value = s.busy;
+  if (errorTimer) clearTimeout(errorTimer);
+  if (s.error) {
+    error.value = s.error;
+    errorTimer = setTimeout(() => (error.value = ''), 8000);
+  }
+}
+
+function pickFiles() {
+  const input = fileInput.value;
+  if (!input) return;
+  terminalBus.attach(props.slot, Array.from(input.files ?? []));
+  input.value = '';
+}
+
 function onFocus() {
   store.focusedSlot = props.slot;
 }
@@ -85,6 +106,28 @@ function onBlur() {
         <span v-if="focused && live" class="typing">typing here</span>
         <StateBadge :state="info.state" />
         <div class="pactions">
+          <template v-if="live">
+            <input
+              ref="fileInput"
+              type="file"
+              multiple
+              hidden
+              :aria-label="`Choose files to send to slot ${slot}`"
+              data-testid="attach-input"
+              @change="pickFiles"
+            />
+            <button
+              type="button"
+              class="icon-btn"
+              :aria-label="`Send a file to ${info.task}`"
+              title="Send a file or image (or paste or drop one on the terminal)"
+              data-testid="attach"
+              :disabled="uploading"
+              @click="fileInput?.click()"
+            >
+              <AppIcon name="attach" :size="16" />
+            </button>
+          </template>
           <button
             type="button"
             class="icon-btn"
@@ -120,7 +163,7 @@ function onBlur() {
       </header>
 
       <div class="well">
-        <TerminalView :slot="slot" @focus="onFocus" @blur="onBlur" @shortcut="handleShortcut" />
+        <TerminalView :slot="slot" @focus="onFocus" @blur="onBlur" @shortcut="handleShortcut" @attach="onAttach" />
 
         <div v-if="showStarting" class="starting" role="status">
           <span class="spinner" aria-hidden="true" />
@@ -142,6 +185,7 @@ function onBlur() {
           <button type="button" class="btn btn--sm" :disabled="busy" @click="closePane">Close pane</button>
         </div>
 
+        <p v-if="uploading" class="pnote mono" role="status">Sending file…</p>
         <p v-if="error" class="perror" role="alert">{{ error }}</p>
       </div>
 
@@ -335,6 +379,17 @@ function onBlur() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.pnote {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 12px;
 }
 .perror {
   position: absolute;

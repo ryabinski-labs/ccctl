@@ -25,7 +25,24 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
+/** Sends one file to the host; resolves to its absolute path there. */
+async function upload(slot: number, file: File): Promise<string> {
+  const res = await fetch(`/api/sessions/${slot}/upload?name=${encodeURIComponent(file.name || 'file')}`, {
+    method: 'POST',
+    body: file,
+  });
+  let data: { path?: string; error?: string } | null = null;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+  if (!res.ok || !data?.path) throw new ApiError(data?.error ?? `Upload failed (HTTP ${res.status}).`, res.status);
+  return data.path;
+}
+
 export const api = {
+  upload,
   repos: () => call<{ repos: Repo[] }>('GET', '/api/repos').then((r) => r.repos ?? []),
   inspect: (path: string) => call<Inspection>('GET', `/api/inspect?path=${encodeURIComponent(path)}`),
   launch: (req: LaunchRequest) => call<{ slot: number; info: SlotInfo }>('POST', '/api/sessions', req),
