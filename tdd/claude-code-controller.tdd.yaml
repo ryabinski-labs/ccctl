@@ -3,7 +3,7 @@ feature: claude-code-controller
 title: Claude Code controller
 source:
   prd: docs/prd/claude-code-controller.md
-  prd_sha256: 09a54d8326ffff4e11ba9ad64402b921bfd39bafe20519b1c5f17f37e71a4f9e
+  prd_sha256: 32550cf51e1eef8ec3b4079124a431a7a12f1f1ed6fc29bdcd219b70194e44f0
 defaults:
   priority: P2
 non_goals:
@@ -12,7 +12,7 @@ non_goals:
 - Controlling more than one host from one page (DL-001)
 - tmux integration or attaching to sessions over SSH (DL-001)
 - Read-only viewers or multi-user roles (DL-006)
-- More than 4 concurrent sessions (DL-010)
+- More than 6 concurrent sessions (DL-010, DL-019)
 - HTTPS, TLS certificates, and OS-level browser notifications (DL-009)
 - Permission modes other than bypass (DL-008)
 - Automatic worktree removal (DL-012)
@@ -42,7 +42,7 @@ requirements:
     level: acceptance
     title: Launch form starts a live session in a new worktree
     given: the controller runs with the fake claude, the owner's Tailscale login, a git repo folio under a scanned root, and
-      4 free slots
+      6 free slots
     when: the owner submits the launch form with task fix-login, repo folio, worktree on, first prompt hello world
     then: slot 1 shows the fake claude banner reporting the worktree cwd, the bypass flag, the session UUID, and the prompt
     oracle: within 5000 ms pane 1 text contains 'FAKE_CLAUDE cwd=ROOT/folio-wt-fix-login', '--dangerously-skip-permissions',
@@ -232,12 +232,12 @@ requirements:
     PTY; a maximized pane resizes its PTY.
   priority: P0
   type: functional
-  prd_ref: §5 story 2
+  prd_ref: §5 story 2; DL-019
   scenarios:
   - id: SC-004-a
     level: acceptance
     title: Typing in pane 2 reaches only session 2
-    given: 4 running fake claude sessions that echo every received byte
+    given: 4 of the 6 slots running fake claude sessions that echo every received byte
     when: the owner focuses pane 2 and types hello and Enter
     then: pane 2 shows the echo and no other session received input
     oracle: pane 2 text contains 'ECHO hello' within 2000 ms AND fake claude input logs for slots 1, 3, 4 are empty
@@ -249,10 +249,10 @@ requirements:
   - id: SC-004-b
     level: integration
     title: Input bytes route exactly to one PTY
-    given: 4 sessions connected to one WebSocket client
+    given: 6 sessions connected to one WebSocket client
     when: the client sends input frames for slot 2 carrying 'hello\r', ESC, Ctrl-C, and ESC [A
     then: session 2's PTY receives exactly those bytes and the others receive none
-    oracle: bytes read by fake 2 == 68656c6c6f0d 1b 03 1b5b41 (hex, concatenated) AND fakes 1, 3, 4 read 0 bytes within 500
+    oracle: bytes read by fake 2 == 68656c6c6f0d 1b 03 1b5b41 (hex, concatenated) AND fakes 1, 3, 4, 5, 6 read 0 bytes within 500
       ms
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     tags:
@@ -262,7 +262,7 @@ requirements:
   - id: SC-004-c
     level: integration
     title: Output fan-out keeps per-slot order
-    given: 4 fake sessions that each print lines 1..1000 tagged with their slot
+    given: 6 fake sessions that each print lines 1..1000 tagged with their slot
     when: a WebSocket client collects output frames
     then: every slot's lines arrive complete and in order and tagged with the right slot
     oracle: for each slot s, parsed line numbers from frames tagged s == [1..1000] in order AND no line tagged s contains
@@ -287,7 +287,7 @@ requirements:
   - id: SC-004-e
     level: unit
     title: Maximize and restore
-    given: the grid with 4 panes
+    given: the grid with 4 open sessions (a 2x2 grid)
     when: the owner clicks maximize on pane 3 and then restore
     then: pane 3 alone fills the grid, then the 2x2 layout returns
     oracle: after maximize exactly 1 pane is visible (slot 3); after restore 4 panes are visible in a 2-column grid
@@ -296,10 +296,22 @@ requirements:
     - vitest
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-004-e
     status: green
+  - id: SC-004-g
+    level: acceptance
+    title: Grid reflows as sessions open and close, up to six
+    given: the controller with the fake claude and the page open at 1280x720
+    when: sessions are launched one at a time up to six, and then one session is stopped and closed
+    then: the grid is 1x1 for 0 or 1 open sessions, 2x1 for 2, 2x2 for 3 or 4, and 3x2 for 5 or 6, and it shrinks back when a session is closed
+    oracle: '(open sessions -> visible panes, columns x rows) 0 -> [1], 1x1; 1 -> [1], 1x1; 2 -> [1,2], 2x1; 3 -> [1..4], 2x2; 4 -> [1..4], 2x2; 5 -> [1..6], 3x2; 6 -> [1..6], 3x2 AND every pane is wider than 300 px AND the New session button is disabled with title ''All 6 slots are in use. Stop or close a session first.'' at 6; after closing slot 5 of 5 the grid is [1..4] in 2x2'
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - playwright
+    test_ref: web/e2e/grid.spec.ts::The grid reflows as sessions are added and stops at six
+    status: green
   - id: SC-004-f
     level: acceptance
     title: End-to-end output latency over the tailnet
-    given: the controller on mac-mini with 4 busy sessions and the page open on laptop
+    given: the controller on mac-mini with 6 busy sessions and the page open on laptop
     when: 200 timestamped echo samples are sent through pane 1
     then: the p95 output-to-render latency is within budget
     oracle: p95(render_time - send_time) over 200 samples <= 250 ms
@@ -545,19 +557,19 @@ requirements:
     test_ref: web/src/tdd/claude_code_controller.tdd.spec.ts::SC-006-i
     status: green
 - id: REQ-007
-  text: At most 4 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited
+  text: At most 6 sessions are active (starting, running, needs-input); a launch takes the lowest free slot, where exited
     and resume-failed panes count as free and are replaced without touching their worktrees.
   priority: P0
   type: functional
-  prd_ref: §5 story 5; DL-010; DL-016
+  prd_ref: §5 story 5; DL-010; DL-016; DL-019
   scenarios:
   - id: SC-007-a
     level: unit
     title: Slot allocation table
     given: slot states combinations
     when: the next slot is chosen
-    then: the lowest slot that is empty, exited or resume-failed is chosen; none when 4 are active
-    oracle: '[empty,run,run,run]->1; [run,run,run,exited]->4; [run,resume-failed,exited,run]->2; [run,starting,needs-input,run]->none'
+    then: the lowest slot that is empty, exited or resume-failed is chosen; none when 6 are active
+    oracle: '[empty,run,run,run]->1; [run,run,run,exited]->4; [run,resume-failed,exited,run]->2; [run,starting,needs-input,run]->none; [run,run,run,run,run,empty]->6; [run,run,run,run,run,run]->none; [run,run,run,run,exited,run]->5'
     doubles: none; pure function
     tags:
     - go
@@ -565,12 +577,12 @@ requirements:
     status: green
   - id: SC-007-b
     level: integration
-    title: Fifth active launch is refused
-    given: 4 active sessions
+    title: Launch beyond the cap is refused
+    given: 6 active sessions (every slot)
     when: a launch request arrives through the API
     then: it is refused with 409 and nothing starts
-    oracle: status == 409 AND body contains 'All 4 slots are in use. Stop or close a session first.' AND fake claude invocation
-      count stays 4
+    oracle: status == 409 AND body contains 'All 6 slots are in use. Stop or close a session first.' AND fake claude invocation
+      count stays 6
     doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
     negative: true
     tags:
@@ -592,10 +604,10 @@ requirements:
   - id: SC-007-d
     level: unit
     title: New session control state
-    given: a session store with 4 active slots, and then 3 active plus 1 exited
+    given: a session store with 6 active slots, and then 5 active plus 1 exited
     when: the header renders
     then: the control is disabled with the tooltip in the first case and enabled in the second
-    oracle: 'case 1: button.disabled == true AND title == ''All 4 slots are in use. Stop or close a session first.''; case
+    oracle: 'case 1: button.disabled == true AND title == ''All 6 slots are in use. Stop or close a session first.''; case
       2: button.disabled == false'
     doubles: mocked session store
     tags:
@@ -916,7 +928,7 @@ requirements:
     - manual
     status: red
 - id: REQ-013
-  text: 'Non-functional budgets from §13 hold: controller-added latency p95 <= 20 ms with 4 busy sessions, controller RSS
+  text: 'Non-functional budgets from §13 hold: controller-added latency p95 <= 20 ms with 6 busy sessions, controller RSS
     <= 150 MB, page first load <= 2 s over the tailnet, binary <= 30 MB per platform.'
   priority: P2
   type: non-functional
@@ -925,7 +937,7 @@ requirements:
   - id: SC-013-a
     level: integration
     title: Controller-added output latency
-    given: 4 fake sessions printing continuously and one WebSocket client
+    given: 6 fake sessions printing continuously and one WebSocket client
     when: 10,000 output chunks are timestamped at PTY read and at WebSocket write
     then: the p95 delta is within budget
     oracle: p95(ws_write_ts - pty_read_ts) <= 20 ms
@@ -938,7 +950,7 @@ requirements:
   - id: SC-013-b
     level: acceptance
     title: Controller memory ceiling
-    given: 4 sessions each with a full 1 MiB scrollback buffer on mac-mini
+    given: 6 sessions each with a full 1 MiB scrollback buffer on mac-mini
     when: ps reports the controller's resident memory
     then: memory is within budget
     oracle: RSS of the ccctl process (excluding claude processes) <= 150 MB
