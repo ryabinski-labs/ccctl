@@ -7,6 +7,8 @@ export interface TerminalSink {
   reset(): void;
   focus(): void;
   text(): string;
+  /** Uploads files to the host and pastes their paths into the session. */
+  attach(files: File[]): void;
 }
 
 const sinks = new Map<number, TerminalSink>();
@@ -41,6 +43,9 @@ export const terminalBus = {
   },
   text(slot: number): string {
     return sinks.get(slot)?.text() ?? '';
+  },
+  attach(slot: number, files: File[]) {
+    sinks.get(slot)?.attach(files);
   },
 };
 

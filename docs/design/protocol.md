@@ -34,6 +34,7 @@ interface SlotInfo {
 | POST | `/api/sessions/{slot}/stop` | – | 202 `{}` | 404 |
 | POST | `/api/sessions/{slot}/fresh` | – | 201 `{slot, info}` | 400/404 |
 | POST | `/api/sessions/{slot}/close` | – | 200 `{}` (slot becomes null; only exited/resume-failed) | 400/404 |
+| POST | `/api/sessions/{slot}/upload?name=N` | raw file bytes (max 25 MiB); `Origin` required | 201 `{path, size}`; `path` is absolute, under `~/.ccctl/uploads`, mode 0600 | 403 bad Origin; 404 empty slot; 413 too large |
 
 ## WebSocket `GET /ws`
 

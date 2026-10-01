@@ -49,7 +49,7 @@ type Server struct {
 var Routes = []struct{ Method, Path string }{
 	{"GET", "/"}, {"GET", "/assets/x.js"}, {"GET", "/api/state"}, {"GET", "/api/repos"}, {"GET", "/api/inspect"},
 	{"POST", "/api/sessions"}, {"POST", "/api/sessions/1/stop"}, {"POST", "/api/sessions/1/fresh"},
-	{"POST", "/api/sessions/1/close"}, {"GET", "/ws"},
+	{"POST", "/api/sessions/1/close"}, {"POST", "/api/sessions/1/upload"}, {"GET", "/ws"},
 	{"GET", "/api/settings/env"}, {"PUT", "/api/settings/env/X"}, {"DELETE", "/api/settings/env/X"},
 }
 
@@ -59,6 +59,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/repos", s.repos)
 	mux.HandleFunc("GET /api/inspect", s.inspect)
 	mux.HandleFunc("POST /api/sessions", s.launch)
+	mux.HandleFunc("POST /api/sessions/{slot}/upload", s.upload)
 	mux.HandleFunc("POST /api/sessions/{slot}/{action}", s.action)
 	mux.HandleFunc("GET /ws", s.ws)
 	mux.HandleFunc("GET /api/settings/env", s.envList)
