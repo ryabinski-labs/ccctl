@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/server"
-	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
+	"github.com/ryabinski-labs/ccctl/internal/server"
+	tu "github.com/ryabinski-labs/ccctl/internal/testutil"
 )
 
 func postUpload(t *testing.T, h *tu.H, slot, name string, body []byte, origin string) (int, []byte) {

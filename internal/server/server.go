@@ -18,10 +18,10 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/auth"
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/repos"
-	"github.com/ryabinski-labs/claude-code-controller/internal/session"
+	"github.com/ryabinski-labs/ccctl/internal/auth"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/repos"
+	"github.com/ryabinski-labs/ccctl/internal/session"
 )
 
 // Frame type bytes.

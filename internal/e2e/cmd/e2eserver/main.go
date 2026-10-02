@@ -19,11 +19,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/app"
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/repos"
-	"github.com/ryabinski-labs/claude-code-controller/internal/testutil"
-	"github.com/ryabinski-labs/claude-code-controller/web"
+	"github.com/ryabinski-labs/ccctl/internal/app"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/repos"
+	"github.com/ryabinski-labs/ccctl/internal/testutil"
+	"github.com/ryabinski-labs/ccctl/web"
 )
 
 func main() {

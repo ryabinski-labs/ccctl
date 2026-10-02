@@ -17,11 +17,11 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/app"
-	"github.com/ryabinski-labs/claude-code-controller/internal/server"
-	"github.com/ryabinski-labs/claude-code-controller/internal/session"
-	"github.com/ryabinski-labs/claude-code-controller/internal/statuscmd"
-	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
+	"github.com/ryabinski-labs/ccctl/internal/app"
+	"github.com/ryabinski-labs/ccctl/internal/server"
+	"github.com/ryabinski-labs/ccctl/internal/session"
+	"github.com/ryabinski-labs/ccctl/internal/statuscmd"
+	tu "github.com/ryabinski-labs/ccctl/internal/testutil"
 )
 
 func asOther(f *tu.FakeTS) { f.Login = "other@example" }

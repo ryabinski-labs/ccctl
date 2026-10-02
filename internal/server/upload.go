@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/auth"
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/session"
+	"github.com/ryabinski-labs/ccctl/internal/auth"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/session"
 )
 
 const (

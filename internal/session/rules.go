@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/config"
 )
 
 // Spec messages (§5), verbatim.

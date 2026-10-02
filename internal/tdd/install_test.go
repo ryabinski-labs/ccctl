@@ -11,7 +11,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/install"
+	"github.com/ryabinski-labs/ccctl/internal/install"
 )
 
 // plistValue is a parsed plist node: a string, bool, []plistValue, or map.

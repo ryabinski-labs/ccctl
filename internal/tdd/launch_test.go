@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/session"
-	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/session"
+	tu "github.com/ryabinski-labs/ccctl/internal/testutil"
 )
 
 func resolved(p string) string { r, _ := filepath.EvalSymlinks(p); return r }

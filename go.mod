@@ -1,4 +1,4 @@
-module github.com/ryabinski-labs/claude-code-controller
+module github.com/ryabinski-labs/ccctl
 
 go 1.26.0
 

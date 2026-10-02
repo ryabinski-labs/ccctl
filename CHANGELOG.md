@@ -4,6 +4,7 @@ Notable changes to ccctl. Release binaries and their notes are on the [Releases 
 
 ## Unreleased
 
+- The project is now named ccctl and lives at `github.com/ryabinski-labs/ccctl` (it was `claude-code-controller`), so its name no longer contains Anthropic's "Claude Code" trademark. GitHub redirects the old URLs, so existing installs keep upgrading.
 - New session lists repos only from the folder you set in Settings (`repo_prefix` in `config.toml`). Nothing is scanned until it is set, and the old `roots` setting and the scan of `~` are gone. A scan that takes more than 10 seconds, for example while macOS waits for a privacy prompt, now stops with an explanation and a Retry button instead of showing "Scanning folders…" forever.
 - Terminal text is 10 px (was 13 px), the same cell width as Monaco 10 in macOS Terminal, so each pane shows more columns and rows.
 - Run up to six sessions (was four). The pane grid now grows with the number of open sessions: one pane fills the page, two sit side by side, three or four make a 2x2, five or six make a 3x2. The "Start a session" card only appears when the grid has a spare cell, and `Ctrl+Shift+1` to `6` focus the panes.
