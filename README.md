@@ -18,6 +18,9 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 | **Platforms** | Host: macOS or Linux, arm64 or amd64. Viewer: any modern browser on your tailnet. |
 | **License** | [MIT](LICENSE) |
 
+![Six Claude Code sessions in one ccctl page; two amber panes need input.](docs/screenshots/grid.png)
+*Sample sessions with staged output; the interface is real.*
+
 ### Use it when
 
 - Claude Code is installed and logged in on one always-on machine, and you want to drive it from other devices.
@@ -58,6 +61,16 @@ tar xzf ccctl_darwin_arm64.tar.gz ccctl
 ```
 
 Expected result: `ccctl status` prints the controller URL, for example `http://100.64.0.10:7681`. Open it from any device on your tailnet. On macOS, read [macOS firewall](#macos-firewall) if the page never loads.
+
+### Start a session
+
+![The New session dialog: a task name, a searchable list of repos under your repository folder, an "Isolate in a git worktree" switch, and an optional first prompt.](docs/screenshots/new-session.png)
+
+Pick a task name and a repo. For git repos, ccctl creates a sibling worktree on its own branch, so parallel tasks do not edit the same files.
+
+![The Settings dialog: the repository folder that New session scans, and variables such as API keys added to every session you start.](docs/screenshots/settings.png)
+
+Settings holds the one folder that New session scans for repos and the environment variables (such as API keys) that every new session receives.
 
 ## Documentation
 
