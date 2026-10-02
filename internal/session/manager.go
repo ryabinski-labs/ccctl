@@ -16,9 +16,9 @@ import (
 	"github.com/creack/pty"
 	"github.com/google/uuid"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/logx"
-	"github.com/ryabinski-labs/claude-code-controller/internal/state"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/logx"
+	"github.com/ryabinski-labs/ccctl/internal/state"
 )
 
 // Info is the public view of a slot (protocol SlotInfo).

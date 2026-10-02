@@ -19,14 +19,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/auth"
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/hook"
-	"github.com/ryabinski-labs/claude-code-controller/internal/logx"
-	"github.com/ryabinski-labs/claude-code-controller/internal/server"
-	"github.com/ryabinski-labs/claude-code-controller/internal/session"
-	"github.com/ryabinski-labs/claude-code-controller/internal/state"
-	"github.com/ryabinski-labs/claude-code-controller/internal/tailscale"
+	"github.com/ryabinski-labs/ccctl/internal/auth"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/hook"
+	"github.com/ryabinski-labs/ccctl/internal/logx"
+	"github.com/ryabinski-labs/ccctl/internal/server"
+	"github.com/ryabinski-labs/ccctl/internal/session"
+	"github.com/ryabinski-labs/ccctl/internal/state"
+	"github.com/ryabinski-labs/ccctl/internal/tailscale"
 )
 
 type Options struct {

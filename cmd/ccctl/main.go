@@ -1,4 +1,4 @@
-// Command ccctl runs and manages the Claude Code controller.
+// Command ccctl runs and manages ccctl, a web controller for Claude Code sessions.
 package main
 
 import (
@@ -15,14 +15,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/app"
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/hook"
-	"github.com/ryabinski-labs/claude-code-controller/internal/install"
-	"github.com/ryabinski-labs/claude-code-controller/internal/logx"
-	"github.com/ryabinski-labs/claude-code-controller/internal/statuscmd"
-	"github.com/ryabinski-labs/claude-code-controller/internal/tailscale"
-	"github.com/ryabinski-labs/claude-code-controller/web"
+	"github.com/ryabinski-labs/ccctl/internal/app"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/hook"
+	"github.com/ryabinski-labs/ccctl/internal/install"
+	"github.com/ryabinski-labs/ccctl/internal/logx"
+	"github.com/ryabinski-labs/ccctl/internal/statuscmd"
+	"github.com/ryabinski-labs/ccctl/internal/tailscale"
+	"github.com/ryabinski-labs/ccctl/web"
 )
 
 var version = "dev"

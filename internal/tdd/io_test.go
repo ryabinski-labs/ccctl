@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	tu "github.com/ryabinski-labs/ccctl/internal/testutil"
 )
 
 // SC-004-b

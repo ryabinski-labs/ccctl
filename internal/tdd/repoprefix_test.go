@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/repos"
-	"github.com/ryabinski-labs/claude-code-controller/internal/server"
-	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/repos"
+	"github.com/ryabinski-labs/ccctl/internal/server"
+	tu "github.com/ryabinski-labs/ccctl/internal/testutil"
 )
 
 const prefixTimeoutMsg = "Scanning took too long. On a Mac, allow ccctl to access this folder in the prompt on the host, then retry."

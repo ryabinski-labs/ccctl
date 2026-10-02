@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/app"
-	"github.com/ryabinski-labs/claude-code-controller/internal/auth"
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/session"
-	"github.com/ryabinski-labs/claude-code-controller/internal/state"
-	"github.com/ryabinski-labs/claude-code-controller/internal/tailscale"
+	"github.com/ryabinski-labs/ccctl/internal/app"
+	"github.com/ryabinski-labs/ccctl/internal/auth"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/session"
+	"github.com/ryabinski-labs/ccctl/internal/state"
+	"github.com/ryabinski-labs/ccctl/internal/tailscale"
 )
 
 // SC-001-c

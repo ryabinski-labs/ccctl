@@ -13,10 +13,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/config"
-	"github.com/ryabinski-labs/claude-code-controller/internal/session"
-	"github.com/ryabinski-labs/claude-code-controller/internal/state"
-	tu "github.com/ryabinski-labs/claude-code-controller/internal/testutil"
+	"github.com/ryabinski-labs/ccctl/internal/config"
+	"github.com/ryabinski-labs/ccctl/internal/session"
+	"github.com/ryabinski-labs/ccctl/internal/state"
+	tu "github.com/ryabinski-labs/ccctl/internal/testutil"
 )
 
 // SC-008-b

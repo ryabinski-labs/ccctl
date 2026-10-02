@@ -28,7 +28,7 @@ const (
 	// Label is the launchd agent label.
 	Label = "com.ryabinski-labs.ccctl"
 	// Repo is the GitHub repository that publishes releases.
-	Repo = "ryabinski-labs/claude-code-controller"
+	Repo = "ryabinski-labs/ccctl"
 	// UnitName is the systemd user unit name.
 	UnitName = "ccctl.service"
 )
@@ -125,7 +125,7 @@ func RenderLaunchdPlist(binPath string, env map[string]string, logDir string) ([
 // RenderSystemdUnit renders the Linux user unit that runs "binPath serve".
 func RenderSystemdUnit(binPath string, env map[string]string) string {
 	var b strings.Builder
-	b.WriteString("[Unit]\nDescription=ccctl Claude Code controller\nAfter=network-online.target\n\n[Service]\n")
+	b.WriteString("[Unit]\nDescription=ccctl, a web controller for Claude Code sessions\nAfter=network-online.target\n\n[Service]\n")
 	b.WriteString("ExecStart=" + binPath + " serve\n")
 	b.WriteString("Restart=always\nRestartSec=2\n")
 	for _, k := range sortedKeys(env) {

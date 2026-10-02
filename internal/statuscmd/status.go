@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/hook"
-	"github.com/ryabinski-labs/claude-code-controller/internal/tailscale"
+	"github.com/ryabinski-labs/ccctl/internal/hook"
+	"github.com/ryabinski-labs/ccctl/internal/tailscale"
 )
 
 const (

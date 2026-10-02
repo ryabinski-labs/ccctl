@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/logx"
+	"github.com/ryabinski-labs/ccctl/internal/logx"
 )
 
 // Authorize reports whether login is on the allowlist. An empty login (WhoIs failure) is denied.

@@ -1,4 +1,4 @@
-# ccctl: claude-code-controller
+# ccctl
 
 **ccctl is a web controller for up to six live [Claude Code](https://docs.claude.com/en/docs/claude-code) sessions on one machine, reached privately over Tailscale.**
 
@@ -51,7 +51,7 @@ On the host (the machine that runs Claude Code), with Tailscale running and `cla
 
 ```sh
 # Pick your platform: ccctl_{darwin,linux}_{arm64,amd64}.tar.gz
-curl -fsSL -O https://github.com/ryabinski-labs/claude-code-controller/releases/latest/download/ccctl_darwin_arm64.tar.gz
+curl -fsSL -O https://github.com/ryabinski-labs/ccctl/releases/latest/download/ccctl_darwin_arm64.tar.gz
 tar xzf ccctl_darwin_arm64.tar.gz ccctl
 ./ccctl install
 ~/.ccctl/bin/ccctl status
@@ -83,7 +83,7 @@ Tailscale running on the host and on the viewing device, Claude Code installed a
 
 ### Install
 
-Download a release binary as shown in the [Quickstart](#quickstart), then run `ccctl install`. To check the download first, compare it against `checksums.txt` on the release page, or verify its build provenance with `gh attestation verify ccctl_darwin_arm64.tar.gz --repo ryabinski-labs/claude-code-controller`.
+Download a release binary as shown in the [Quickstart](#quickstart), then run `ccctl install`. To check the download first, compare it against `checksums.txt` on the release page, or verify its build provenance with `gh attestation verify ccctl_darwin_arm64.tar.gz --repo ryabinski-labs/ccctl`.
 
 The macOS binaries are not signed or notarized. Downloading with `curl`, as above, avoids the Gatekeeper quarantine prompt that a browser download triggers.
 

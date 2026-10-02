@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/ryabinski-labs/claude-code-controller/internal/session"
+	"github.com/ryabinski-labs/ccctl/internal/session"
 )
 
 // MaxDepth is how many folder levels under a root are searched.
