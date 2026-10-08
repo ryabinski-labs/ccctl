@@ -4,6 +4,9 @@ Notable changes to ccctl. Release binaries and their notes are on the [Releases 
 
 ## Unreleased
 
+- `ccctl install` on Linux now restarts the service, so an upgrade takes effect. Before, `systemctl --user enable --now` left the old binary running.
+- Settings keeps a repository folder you type before the saved one has loaded. Before, the loaded value replaced what you typed, and Save folder stayed disabled.
+- `scripts/rebuild-restart.sh` builds the current checkout and installs and restarts it as the service, on a new host or an existing one.
 - A session waiting at Claude Code's "Do you trust this folder?" prompt now shows as Needs input (amber header, tab count, chime) instead of Running. That prompt fires no hook, so it appeared for every new worktree folder without any signal.
 - Resume any Claude Code session by its ID: in New session, choose **Resume by ID** and paste the ID or a whole `claude --resume <id>` command. ccctl finds the session under `~/.claude/projects`, shows its title, folder, and last activity, suggests a task name, and starts `claude --resume <id>` in the folder the session ran in. A session that is already open, in another slot or in a terminal outside ccctl, cannot be opened twice, and a session whose folder was deleted is flagged before you submit.
 - The project is now named ccctl and lives at `github.com/ryabinski-labs/ccctl` (it was `claude-code-controller`), so its name no longer contains Anthropic's "Claude Code" trademark. GitHub redirects the old URLs, so existing installs keep upgrading.

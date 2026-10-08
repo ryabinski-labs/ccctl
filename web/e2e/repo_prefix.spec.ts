@@ -58,6 +58,24 @@ test.describe('REQ-pfx-set — The owner can set, change and clear one repositor
       await openLaunch(page);
       await expect.poll(() => repoPaths(page)).toContain(join(controller.home, 'Documents', 'repo1'));
     });
+
+    test('A folder typed before the saved folder loads is kept', async ({ page, controller }) => {
+      let release = () => {};
+      const held = new Promise<void>((r) => (release = r));
+      await page.route('**/api/settings/repo-prefix', async (route) => {
+        await held;
+        await route.continue();
+      });
+      await openPage(page, controller);
+      await page.getByTestId('settings-open').click();
+      const dialog = page.getByTestId('settings-dialog');
+      await dialog.getByLabel('Repository folder').fill('/no/such/folder');
+      const loaded = page.waitForResponse('**/api/settings/repo-prefix');
+      release();
+      await loaded;
+      await expect(dialog.getByLabel('Repository folder')).toHaveValue('/no/such/folder');
+      await expect(dialog.getByRole('button', { name: 'Save folder' })).toBeEnabled();
+    });
   });
 });
 

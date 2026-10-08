@@ -37,13 +37,8 @@ trap 'rm -rf "$out"' EXIT
 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$out/ccctl" ./cmd/ccctl
 
 step "Installing ccctl $version and loading the service"
-# Copies the binary to ~/.ccctl/bin and (re)loads the launchd agent or systemd unit.
+# Copies the binary to ~/.ccctl/bin and restarts the launchd agent or systemd unit.
 "$out/ccctl" install --local
-
-if [ "$(uname -s)" = "Linux" ]; then
-  # `systemctl enable --now` leaves an already-running old binary in place, so restart explicitly.
-  systemctl --user restart ccctl
-fi
 
 bin="$HOME/.ccctl/bin/ccctl"
 

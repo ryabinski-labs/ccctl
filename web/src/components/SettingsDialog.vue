@@ -37,7 +37,7 @@ onMounted(async () => {
     .repoPrefix()
     .then((p) => {
       savedPrefix.value = p;
-      prefix.value = p;
+      if (!prefix.value) prefix.value = p; // keep anything typed before the load finished
     })
     .catch(() => {
       /* the field stays empty; saving still works */
