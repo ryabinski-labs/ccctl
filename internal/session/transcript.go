@@ -2,14 +2,18 @@ package session
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ryabinski-labs/ccctl/internal/config"
@@ -29,6 +33,9 @@ func MsgTranscriptFolderGone(cwd string) string {
 }
 func MsgAlreadyOpen(id string, slot int) string {
 	return fmt.Sprintf("Session %s is already open in slot %d.", id, slot)
+}
+func MsgOpenElsewhere(id string, pid int) string {
+	return fmt.Sprintf("Session %s is open in another terminal (process %d). Quit it there first, then resume it here.", id, pid)
 }
 
 var uuidRe = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`)
@@ -54,11 +61,16 @@ func ParseSessionID(in string) (string, error) {
 type Transcript struct {
 	SessionID string    `json:"session_id"`
 	Cwd       string    `json:"cwd"`
-	Title     string    `json:"title"`
-	Branch    string    `json:"branch"`
-	Modified  time.Time `json:"modified"`
+	Title      string    `json:"title"`
+	LastPrompt string    `json:"last_prompt"`
+	Branch     string    `json:"branch"`
+	Modified   time.Time `json:"modified"`
+	// CwdMissing is set when the recorded folder no longer exists.
+	CwdMissing bool `json:"cwd_missing"`
 	// OpenSlot is the slot already running this session (0 = none).
 	OpenSlot int `json:"open_slot"`
+	// ExternalPID is a live claude outside ccctl that has this session open (0 = none).
+	ExternalPID int `json:"external_pid"`
 }
 
 // Transcripts can be hundreds of megabytes; only the ends are read.
@@ -91,18 +103,23 @@ func FindTranscript(configDir, id string) (Transcript, error) {
 		Type      string `json:"type"`
 		Cwd       string `json:"cwd"`
 		GitBranch string `json:"gitBranch"`
-		AITitle   string `json:"aiTitle"`
-		Title     string `json:"customTitle"`
-		Summary   string `json:"summary"`
+		AITitle    string `json:"aiTitle"`
+		Title      string `json:"customTitle"`
+		Summary    string `json:"summary"`
+		LastPrompt string `json:"lastPrompt"`
 	}
+	// A user's custom title (/rename) wins over AI titles, which keep being appended after it.
+	var custom, ai, summary string
 	title := func(r rec) {
 		switch {
 		case r.Type == "custom-title" && r.Title != "":
-			t.Title = r.Title
+			custom = r.Title
 		case r.Type == "ai-title" && r.AITitle != "":
-			t.Title = r.AITitle
-		case r.Type == "summary" && r.Summary != "" && t.Title == "":
-			t.Title = r.Summary
+			ai = r.AITitle
+		case r.Type == "summary" && r.Summary != "":
+			summary = r.Summary
+		case r.Type == "last-prompt" && r.LastPrompt != "":
+			t.LastPrompt = r.LastPrompt
 		}
 	}
 	scan := func(r io.Reader, each func(rec)) {
@@ -135,7 +152,49 @@ func FindTranscript(configDir, id string) (Transcript, error) {
 	if t.Cwd == "" {
 		return Transcript{}, errors.New(MsgTranscriptNotFound(id))
 	}
+	t.Title = cmp.Or(custom, ai, summary)
+	if r := []rune(t.LastPrompt); len(r) > 200 {
+		t.LastPrompt = string(r[:200]) + "…"
+	}
+	if fi, err := os.Stat(t.Cwd); err != nil || !fi.IsDir() {
+		t.CwdMissing = true
+	}
 	return t, nil
+}
+
+// ExternalPID returns the pid of a live claude that has session id open, from the
+// registry claude keeps at <configDir>/sessions/<pid>.json (0 = none). An entry whose
+// process has exited, or whose pid now belongs to a process started at another time,
+// is stale and ignored.
+func ExternalPID(configDir, id string) int {
+	files, _ := filepath.Glob(filepath.Join(configDir, "sessions", "*.json"))
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var e struct {
+			PID       int    `json:"pid"`
+			SessionID string `json:"sessionId"`
+			ProcStart string `json:"procStart"`
+		}
+		if json.Unmarshal(b, &e) != nil || e.PID <= 0 || !strings.EqualFold(e.SessionID, id) {
+			continue
+		}
+		if err := syscall.Kill(e.PID, 0); err != nil && !errors.Is(err, syscall.EPERM) {
+			continue
+		}
+		if e.ProcStart != "" {
+			ps := exec.Command("ps", "-o", "lstart=", "-p", strconv.Itoa(e.PID))
+			ps.Env = append(os.Environ(), "TZ=UTC") // claude records procStart in UTC
+			out, err := ps.Output()
+			if err == nil && strings.Join(strings.Fields(string(out)), " ") != strings.Join(strings.Fields(e.ProcStart), " ") {
+				continue
+			}
+		}
+		return e.PID
+	}
+	return 0
 }
 
 // claudeConfigDir is where claude keeps transcripts: CLAUDE_CONFIG_DIR from
@@ -167,8 +226,27 @@ func (m *Manager) LookupTranscript(in string) (Transcript, error) {
 	}
 	m.mu.Lock()
 	t.OpenSlot = m.openSlotLocked(id)
+	ours := m.pidsLocked()
 	m.mu.Unlock()
+	if t.OpenSlot == 0 {
+		if pid := ExternalPID(m.claudeConfigDir(), id); !ours[pid] {
+			t.ExternalPID = pid
+		}
+	}
 	return t, nil
+}
+
+// pidsLocked is the set of claude processes ccctl itself runs. m.mu held.
+func (m *Manager) pidsLocked() map[int]bool {
+	out := map[int]bool{}
+	for _, s := range m.slots {
+		if s != nil {
+			if p := s.Info().PID; p > 0 {
+				out[p] = true
+			}
+		}
+	}
+	return out
 }
 
 func (m *Manager) openSlotLocked(id string) int {

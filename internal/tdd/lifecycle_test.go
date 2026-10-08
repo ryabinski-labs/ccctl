@@ -262,3 +262,16 @@ func TestSc014ASessionLifecycleLogLines(t *testing.T) {
 		t.Error("stopped_by_user != true")
 	}
 }
+
+// QA: claude's folder-trust dialog fires no hook, so its text flips the pane to needs-input.
+func TestTrustDialogFlipsThePaneToNeedsInput(t *testing.T) {
+	h := tu.Start(t, tu.Opts{Mode: "trust"})
+	launchN(h, 1)
+	h.WaitState(1, session.NeedsInput, 5*time.Second)
+	ws := h.Dial()
+	ws.Input(1, "\r")
+	h.WaitState(1, session.Running, 2*time.Second)
+	if ev := h.Log.Events("needs_input"); len(ev) == 0 || ev[0]["hook"] != "trust-dialog" {
+		t.Fatalf("needs_input events = %v", ev)
+	}
+}

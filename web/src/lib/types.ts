@@ -43,10 +43,15 @@ export interface Transcript {
   session_id: string;
   cwd: string;
   title: string;
+  last_prompt: string;
   branch: string;
   modified: string;
+  /** The recorded folder no longer exists. */
+  cwd_missing: boolean;
   /** Slot already running this session; 0 when none. */
   open_slot: number;
+  /** A claude outside ccctl that has this session open; 0 when none. */
+  external_pid: number;
 }
 
 export const MAX_SESSIONS = 6;
