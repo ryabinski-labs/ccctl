@@ -3,3 +3,4 @@ test-results/
 playwright-report/
 web/dist/*
 !web/dist/.gitkeep
+/ccctl

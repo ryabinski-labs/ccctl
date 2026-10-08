@@ -34,39 +34,49 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 
 ## Compared with
 
-All of these let you reach a Claude Code session from another device. ccctl's niche is a single self-hosted page that shows several live terminals at once and flags the one that needs you. Details below were checked on 2026-10-01 and change often; see each project's docs.
+All of these let you reach a Claude Code session from another device. ccctl's niche is a single self-hosted page that shows several live terminals at once and flags the one that needs you. Details below were checked on 2026-10-01 (deck and claude-code-remote on 2026-10-08) and change often; see each project's docs.
 
-| | ccctl | Claude Code [Remote Control](https://code.claude.com/docs/en/remote-control) | Browser UIs such as [CloudCLI](https://github.com/siteboon/claudecodeui) | `tmux` over SSH |
-|---|---|---|---|---|
-| Where sessions run | Your machine | Your machine | Your machine, or a hosted tier | Your machine |
-| Path to your sessions | Direct, over your tailnet | Through Anthropic's servers; the transcript is stored there | Direct (self-hosted) | Direct, over SSH |
-| Sign-in needed | Your Tailscale login | A claude.ai subscription (API keys are not supported) | None beyond the tool's own | SSH key |
-| Several sessions at a glance | Grid of live terminals (1 to 6, resizes as you add) | Session list in the app or claude.ai/code | Session list and tabs | Panes, if you set them up |
-| "Needs input" signal | Amber pane header, tab count, chime | Mobile push notifications | Not documented | None |
-| Worktree per task | Yes, by default for git repos | Optional (`--spawn worktree`) | Not documented | Manual |
-| Cost | Free, MIT | Included with a Claude subscription | Free (AGPL); hosted tier is paid | Free |
+| | ccctl | Claude Code [Remote Control](https://code.claude.com/docs/en/remote-control) | Browser UIs such as [CloudCLI](https://github.com/siteboon/claudecodeui) | Tailnet phone UIs such as [deck](https://github.com/jinbe/deck) and [claude-code-remote](https://github.com/buckle42/claude-code-remote) | `tmux` over SSH |
+|---|---|---|---|---|---|
+| Where sessions run | Your machine | Your machine | Your machine, or a hosted tier | Your machine | Your machine |
+| Path to your sessions | Direct, over your tailnet | Through Anthropic's servers; the transcript is stored there | Direct (self-hosted) | Direct, over your tailnet | Direct, over SSH |
+| Sign-in needed | Your Tailscale login | A claude.ai subscription (API keys are not supported) | None beyond the tool's own | Any device on your tailnet | SSH key |
+| Several sessions at a glance | Grid of live terminals (1 to 6, resizes as you add) | Session list in the app or claude.ai/code | Session list and tabs | deck: a session list with a chat view (not the terminal UI); claude-code-remote: one tmux session | Panes, if you set them up |
+| "Needs input" signal | Amber pane header, tab count, chime | Mobile push notifications | Not documented | deck: web push to the phone; claude-code-remote: none | None |
+| Worktree per task | Yes, by default for git repos | Optional (`--spawn worktree`) | Not documented | deck: optional, asks first | Manual |
+| Cost | Free, MIT | Included with a Claude subscription | Free (AGPL); hosted tier is paid | Free; no license file | Free |
 
-Pick Remote Control if you want Anthropic's mobile app and push notifications, and are happy with a claude.ai login. Pick ccctl if you want the traffic to stay on your own tailnet, work with API-key auth, or watch several terminals side by side.
+Pick Remote Control if you want Anthropic's mobile app and push notifications, and are happy with a claude.ai login. Pick deck or claude-code-remote if you mostly check in from a phone. Pick ccctl if you want several real Claude Code terminals side by side on a desktop browser, each task in its own worktree, limited to your own Tailscale login, and back after a restart.
 
 ## Quickstart
 
 On the host (the machine that runs Claude Code), with Tailscale running and `claude` logged in:
 
 ```sh
-# Pick your platform: ccctl_{darwin,linux}_{arm64,amd64}.tar.gz
-curl -fsSL -O https://github.com/ryabinski-labs/ccctl/releases/latest/download/ccctl_darwin_arm64.tar.gz
-tar xzf ccctl_darwin_arm64.tar.gz ccctl
-./ccctl install
+os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -fsSL https://github.com/ryabinski-labs/ccctl/releases/latest/download/ccctl_${os}_${arch}.tar.gz | tar xz ccctl
+./ccctl install && rm ccctl     # install copies itself to ~/.ccctl/bin; the download is no longer needed
 ~/.ccctl/bin/ccctl status
 ```
 
-Expected result: `ccctl status` prints the controller URL, for example `http://100.64.0.10:7681`. Open it from any device on your tailnet. On macOS, read [macOS firewall](#macos-firewall) if the page never loads.
+Expected result: `ccctl status` prints the controller URL, for example `http://100.64.0.10:7681`. Open it from any device on your tailnet.
+
+- **macOS:** if the page never loads, the firewall is holding the new binary; see [macOS firewall](#macos-firewall).
+- **Linux:** run `loginctl enable-linger $USER` once, or the service stops when you log out.
+
+### Upgrade or move to a new machine
+
+- **Upgrade from a release:** `~/.ccctl/bin/ccctl install` (add `--version vX.Y.Z` to pick one). It replaces the binary and restarts the service; live sessions are resumed.
+- **Build from source** (needs Go and Node 22 too): clone the repo and run `scripts/rebuild-restart.sh`; later, `scripts/rebuild-restart.sh --pull`. It builds, installs, restarts, and prints the URL.
+- **New machine:** run the Quickstart or the source build there. Settings (`~/.ccctl/config.toml`) are per machine; copy that file over to keep your repository folder and `[env]` variables.
 
 ### Start a session
 
 ![The New session dialog: a task name, a searchable list of repos under your repository folder, an "Isolate in a git worktree" switch, and an optional first prompt.](docs/screenshots/new-session.png)
 
 Pick a task name and a repo. For git repos, ccctl creates a sibling worktree on its own branch, so parallel tasks do not edit the same files.
+
+To pick up an existing Claude Code session instead, choose **Resume by ID** and paste its ID or a whole `claude --resume <id>` command. ccctl shows the session's title, folder and last activity, then runs `claude --resume <id>` in the folder the session ran in. A session that is already open, in ccctl or in a terminal, cannot be opened twice.
 
 ![The Settings dialog: the repository folder that New session scans, and variables such as API keys added to every session you start.](docs/screenshots/settings.png)
 
@@ -104,7 +114,7 @@ The macOS binaries are not signed or notarized. Downloading with `curl`, as abov
 
 1. Downloads the latest release, or the tag given with `--version vX.Y.Z`, anonymously, or with `$GITHUB_TOKEN` or `gh auth token` when one is available (this avoids GitHub's lower anonymous rate limit). With `--local`, it copies the running binary instead of downloading.
 2. Records the absolute path of `claude` from your shell as `claude_path`. launchd and systemd do not load your shell `PATH`.
-3. Writes the service and starts it:
+3. Writes the service and (re)starts it, so an upgrade takes effect at once:
    - **macOS:** a launchd user agent `~/Library/LaunchAgents/com.ryabinski-labs.ccctl.plist` with `KeepAlive`.
    - **Linux:** a systemd user unit `~/.config/systemd/user/ccctl.service` with `Restart=always`. Run `loginctl enable-linger $USER` to keep it running while you are logged out.
 
