@@ -5,7 +5,8 @@
 // command from the --settings file; "print A B" prints "slot=S line=n" for n in A..B.
 //
 // Modes ($FAKECLAUDE_MODE_<slot> or $FAKECLAUDE_MODE, comma separated):
-// ignore-hup, exit=N, resume-fail, lines=N, ticker=N (N timestamped lines "TS <unixnano> <i>").
+// ignore-hup, exit=N, resume-fail, lines=N, ticker=N (N timestamped lines "TS <unixnano> <i>"),
+// trust (claude's folder-trust dialog, styled and split across two writes; no hook fires).
 package main
 
 import (
@@ -81,6 +82,12 @@ func main() {
 			os.Exit(n)
 		case "lines":
 			printLines(slot, 1, n)
+		case "trust":
+			time.Sleep(100 * time.Millisecond)
+			// Bytes as claude 2.1 writes them: cursor moves (CSI n G) instead of spaces.
+			os.Stdout.WriteString("\x1b[2GQuick\x1b[8Gsafety\x1b[15Gcheck:\r\r\n\x1b[2G\x1b[38;2;177;185;249m❯\x1b[4GNo,\x1b[8Gexit\x1b[39m\r\r\n\x1b[4GYes,\x1b[9GI\x1b[1")
+			time.Sleep(50 * time.Millisecond)
+			os.Stdout.WriteString("1Gtrust\x1b[17Gthis\x1b[22Gfolder\r\r\n\x1b[2GEnter\x1b[8Gto\x1b[11Gconfirm\r\r\n")
 		case "ticker":
 			go func() {
 				for i := 1; i <= n; i++ {
