@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -111,6 +113,7 @@ type Session struct {
 	curSize   [2]uint16
 	writeMu   sync.Mutex
 	ptyClosed bool // set under mu once ptmx is closed
+	tail      []byte // last raw output bytes, for prompts split across reads
 }
 
 // Sub receives a session's output. C is closed when the subscriber is dropped
@@ -235,6 +238,9 @@ func (m *Manager) resumeByIDLocked(slot int, task string, req LaunchRequest) (In
 	t, err := FindTranscript(m.claudeConfigDir(), id)
 	if err != nil {
 		return Info{}, invalid(err)
+	}
+	if pid := ExternalPID(m.claudeConfigDir(), id); pid != 0 && !m.pidsLocked()[pid] {
+		return Info{}, ValidationError{MsgOpenElsewhere(id, pid)}
 	}
 	dir, err := ValidatePath(t.Cwd)
 	if err != nil {
@@ -396,9 +402,13 @@ func (s *Session) readLoop() {
 				}
 			}
 			first := s.info.State == Starting && !s.info.Resumed
+			trust := s.sawTrustDialogLocked(chunk)
 			s.mu.Unlock()
 			if first {
 				s.markRunning()
+			}
+			if trust {
+				s.m.Hook(s.info.Slot, "trust-dialog", "")
 			}
 		}
 		if err != nil {
@@ -406,6 +416,33 @@ func (s *Session) readLoop() {
 		}
 	}
 	s.wait()
+}
+
+// trustPrompt is claude's folder-trust dialog, which waits for an answer but fires no hook.
+const trustPrompt = "Yes, I trust this folder"
+
+var ansiRe = regexp.MustCompile(`\x1b(\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(\x07|\x1b\\)|[@-Z\\-_])`)
+
+// sawTrustDialogLocked reports whether output so far (chunk plus the previous tail)
+// shows the trust dialog. s.mu held.
+func (s *Session) sawTrustDialogLocked(chunk []byte) bool {
+	b := append(s.tail, chunk...)
+	// claude positions words with cursor moves (CSI n G, CSI n C) rather than spaces.
+	plain := ansiRe.ReplaceAllFunc(b, func(seq []byte) []byte {
+		if last := seq[len(seq)-1]; seq[1] == '[' && (last == 'G' || last == 'C') {
+			return []byte(" ")
+		}
+		return nil
+	})
+	if bytes.Contains(bytes.Join(bytes.Fields(plain), []byte(" ")), []byte(trustPrompt)) {
+		s.tail = nil
+		return true
+	}
+	if len(b) > 512 {
+		b = b[len(b)-512:]
+	}
+	s.tail = append([]byte(nil), b...)
+	return false
 }
 
 func (s *Session) wait() {

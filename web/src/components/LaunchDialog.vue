@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { api, ApiError } from '../lib/api';
 import { filterRepos, repoListState, type ReposResponse } from '../lib/repoList';
 import { TEXT, type Inspection, type Repo, type Transcript } from '../lib/types';
@@ -42,6 +42,15 @@ const transcript = ref<Transcript | null>(null);
 const lookingUp = ref(false);
 const lookupError = ref('');
 const taskEdited = ref(false);
+// The name last filled in from a looked-up session; cleared again when leaving Resume by ID.
+let autoTask = '';
+const BAD_ID = 'Paste a session ID such as 18cf1881-5565-4e54-b0fd-ffafef9e86b1, or a claude --resume command.';
+
+/** One session UUID from a bare ID or a pasted command; '' when there is none or more than one. */
+function parseSessionId(input: string): string {
+  const ids = new Set((input.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi) ?? []).map((m) => m.toLowerCase()));
+  return ids.size === 1 ? [...ids][0] : '';
+}
 const resumeField = ref<HTMLInputElement | null>(null);
 
 const folderPath = computed(() => (useCustom.value ? customPath.value.trim() : selected.value));
@@ -76,19 +85,27 @@ const preview = computed(() => {
 
 const canSubmit = computed(() => {
   if (submitting.value) return false;
-  if (mode.value === 'resume') return !!transcript.value && !transcript.value.open_slot && !lookingUp.value;
+  if (mode.value === 'resume') return resumable.value && !lookingUp.value;
   return !!folderPath.value && !pathError.value && prompt.value.length <= PROMPT_MAX;
 });
 
+const resumable = computed(
+  () => !!transcript.value && !transcript.value.open_slot && !transcript.value.external_pid && !transcript.value.cwd_missing,
+);
+
 /** Task name from the session title: "Quota issue" -> "quota-issue", unique among open sessions. */
 function taskFromTitle(t: Transcript): string {
-  const base =
-    t.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 36)
-      .replace(/-+$/, '') || `resume-${t.session_id.slice(0, 8)}`;
+  const words = (t.title || t.last_prompt)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .split('-');
+  let base = '';
+  for (const w of words) {
+    if (!w || (base && base.length + 1 + w.length > 38)) break;
+    base = base ? `${base}-${w}` : w.slice(0, 38);
+  }
+  base ||= `resume-${t.session_id.slice(0, 8)}`;
   let name = base;
   for (let n = 2; openTasks.value.includes(name); n++) name = `${base}-${n}`;
   return name;
@@ -110,17 +127,20 @@ watch(resumeInput, (v) => {
   transcript.value = null;
   lookupError.value = '';
   if (lookupTimer) clearTimeout(lookupTimer);
-  if (!v.trim()) {
-    lookingUp.value = false;
+  lookingUp.value = false;
+  if (!v.trim()) return;
+  const id = parseSessionId(v);
+  if (!id) {
+    lookupError.value = BAD_ID;
     return;
   }
   lookingUp.value = true;
   lookupTimer = setTimeout(async () => {
     try {
-      const t = await api.transcript(v.trim());
+      const t = await api.transcript(id);
       if (seq !== lookupSeq) return;
       transcript.value = t;
-      if (!taskEdited.value) task.value = taskFromTitle(t);
+      if (!taskEdited.value) task.value = autoTask = taskFromTitle(t);
     } catch (e) {
       if (seq !== lookupSeq) return;
       lookupError.value = e instanceof ApiError ? e.message : 'The controller did not respond. Try again.';
@@ -130,11 +150,17 @@ watch(resumeInput, (v) => {
   }, 300);
 });
 
-watch(mode, async (m) => {
+watch(mode, (m) => {
   serverError.value = '';
-  await nextTick();
-  if (m === 'resume') resumeField.value?.focus();
+  if (m === 'new' && !taskEdited.value && task.value === autoTask) task.value = '';
 });
+
+/** A pointer click on Resume by ID moves on to the ID field; arrow keys stay in the radio group. */
+function pointerToResume(e: MouseEvent) {
+  if (e.detail === 0) return; // keyboard-generated click
+  // After the label's default action, which focuses the radio itself.
+  setTimeout(() => resumeField.value?.focus());
+}
 
 let inspectSeq = 0;
 async function inspect(path: string) {
@@ -215,7 +241,7 @@ async function submit() {
     const resuming = mode.value === 'resume';
     const r = await api.launch(
       resuming
-        ? { task: normalizedTask.value, path: '', worktree: false, prompt: '', slot: props.slot, resume_id: resumeInput.value.trim() }
+        ? { task: normalizedTask.value, path: '', worktree: false, prompt: '', slot: props.slot, resume_id: transcript.value?.session_id ?? resumeInput.value.trim() }
         : {
             task: normalizedTask.value,
             path: folderPath.value,
@@ -290,7 +316,7 @@ onMounted(async () => {
             <input v-model="mode" type="radio" name="mode" value="new" data-testid="mode-new" />
             <span><AppIcon name="plus" :size="14" />Start new</span>
           </label>
-          <label class="seg-opt">
+          <label class="seg-opt" @click="pointerToResume">
             <input v-model="mode" type="radio" name="mode" value="resume" data-testid="mode-resume" />
             <span><AppIcon name="refresh" :size="14" />Resume by ID</span>
           </label>
@@ -314,8 +340,9 @@ onMounted(async () => {
         <div id="launch-resume-status" aria-live="polite">
           <p v-if="lookupError" class="hint hint--err" data-testid="resume-error">{{ lookupError }}</p>
           <p v-else-if="lookingUp" class="hint">Looking for that session on the host…</p>
-          <div v-else-if="transcript" class="found" :class="{ 'found--warn': transcript.open_slot }" data-testid="resume-found">
+          <div v-else-if="transcript" class="found" :class="{ 'found--warn': !resumable }" data-testid="resume-found">
             <p class="found-title">{{ transcript.title || 'Untitled session' }}</p>
+            <p v-if="transcript.last_prompt" class="found-prompt">Last prompt: {{ transcript.last_prompt }}</p>
             <p class="found-meta">
               <AppIcon name="folder" :size="14" /><span class="mono">{{ transcript.cwd }}</span>
             </p>
@@ -325,6 +352,12 @@ onMounted(async () => {
             </p>
             <p v-if="transcript.open_slot" class="found-warn">
               <AppIcon name="alert" :size="14" />Already open in slot {{ transcript.open_slot }}.
+            </p>
+            <p v-else-if="transcript.external_pid" class="found-warn">
+              <AppIcon name="alert" :size="14" />Open in another terminal (process {{ transcript.external_pid }}). Quit it there first.
+            </p>
+            <p v-else-if="transcript.cwd_missing" class="found-warn">
+              <AppIcon name="alert" :size="14" />This folder no longer exists, so the session cannot resume.
             </p>
           </div>
           <p v-else class="hint">
@@ -783,6 +816,13 @@ legend {
 .found-title {
   font-weight: 600;
   color: var(--ink);
+}
+.found-prompt {
+  margin-top: 2px !important;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .found-meta,
 .found-warn {
