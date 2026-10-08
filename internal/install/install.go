@@ -357,8 +357,12 @@ func Run(ctx context.Context, o Options) error {
 		if out, err := o.Run(ctx, "systemctl", "--user", "daemon-reload"); err != nil {
 			return fmt.Errorf("systemctl daemon-reload: %v: %s", err, out)
 		}
-		if out, err := o.Run(ctx, "systemctl", "--user", "enable", "--now", "ccctl"); err != nil {
+		if out, err := o.Run(ctx, "systemctl", "--user", "enable", "ccctl"); err != nil {
 			return fmt.Errorf("systemctl enable: %v: %s", err, out)
+		}
+		// restart, not `enable --now`: on an upgrade the old binary is still running.
+		if out, err := o.Run(ctx, "systemctl", "--user", "restart", "ccctl"); err != nil {
+			return fmt.Errorf("systemctl restart: %v: %s", err, out)
 		}
 		fmt.Fprintf(o.Out, "Enabled systemd user unit %s\n", p)
 		fmt.Fprintf(o.Out, "To keep ccctl running while you are logged out, run: loginctl enable-linger %s\n", o.Env("USER"))

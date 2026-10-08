@@ -181,6 +181,8 @@ npm --prefix web run build       # builds web/dist, which the Go binary embeds
 go run ./cmd/ccctl serve         # needs Tailscale running on this machine
 ```
 
+To build this checkout and run it as the background service (first install or upgrade), run `scripts/rebuild-restart.sh` on the host. Add `--pull` to `git pull` first. Live sessions are resumed after the restart.
+
 ## Tests
 
 ```sh
