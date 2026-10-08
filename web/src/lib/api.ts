@@ -1,4 +1,4 @@
-import type { Inspection, LaunchRequest, SlotInfo } from './types';
+import type { Inspection, LaunchRequest, SlotInfo, Transcript } from './types';
 import type { ReposResponse } from './repoList';
 
 export class ApiError extends Error {
@@ -50,6 +50,7 @@ export const api = {
   repoPrefixSet: (prefix: string) => call<{ prefix: string }>('PUT', '/api/settings/repo-prefix', { prefix }).then((r) => r.prefix),
   repoPrefixClear: () => call<{ prefix: string }>('DELETE', '/api/settings/repo-prefix').then((r) => r.prefix),
   inspect: (path: string) => call<Inspection>('GET', `/api/inspect?path=${encodeURIComponent(path)}`),
+  transcript: (id: string) => call<Transcript>('GET', `/api/transcript?id=${encodeURIComponent(id)}`),
   launch: (req: LaunchRequest) => call<{ slot: number; info: SlotInfo }>('POST', '/api/sessions', req),
   stop: (slot: number) => call<object>('POST', `/api/sessions/${slot}/stop`),
   fresh: (slot: number) => call<{ slot: number; info: SlotInfo }>('POST', `/api/sessions/${slot}/fresh`),

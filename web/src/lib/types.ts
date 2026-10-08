@@ -34,6 +34,19 @@ export interface LaunchRequest {
   worktree: boolean;
   prompt: string;
   slot?: number;
+  /** Resume this saved claude session (ID or pasted `claude --resume` command) in its own folder. */
+  resume_id?: string;
+}
+
+/** A saved claude session found under ~/.claude/projects (GET /api/transcript). */
+export interface Transcript {
+  session_id: string;
+  cwd: string;
+  title: string;
+  branch: string;
+  modified: string;
+  /** Slot already running this session; 0 when none. */
+  open_slot: number;
 }
 
 export const MAX_SESSIONS = 6;
