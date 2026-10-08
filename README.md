@@ -34,19 +34,19 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 
 ## Compared with
 
-All of these let you reach a Claude Code session from another device. ccctl's niche is a single self-hosted page that shows several live terminals at once and flags the one that needs you. Details below were checked on 2026-10-01 and change often; see each project's docs.
+All of these let you reach a Claude Code session from another device. ccctl's niche is a single self-hosted page that shows several live terminals at once and flags the one that needs you. Details below were checked on 2026-10-01 (deck and claude-code-remote on 2026-10-08) and change often; see each project's docs.
 
-| | ccctl | Claude Code [Remote Control](https://code.claude.com/docs/en/remote-control) | Browser UIs such as [CloudCLI](https://github.com/siteboon/claudecodeui) | `tmux` over SSH |
-|---|---|---|---|---|
-| Where sessions run | Your machine | Your machine | Your machine, or a hosted tier | Your machine |
-| Path to your sessions | Direct, over your tailnet | Through Anthropic's servers; the transcript is stored there | Direct (self-hosted) | Direct, over SSH |
-| Sign-in needed | Your Tailscale login | A claude.ai subscription (API keys are not supported) | None beyond the tool's own | SSH key |
-| Several sessions at a glance | Grid of live terminals (1 to 6, resizes as you add) | Session list in the app or claude.ai/code | Session list and tabs | Panes, if you set them up |
-| "Needs input" signal | Amber pane header, tab count, chime | Mobile push notifications | Not documented | None |
-| Worktree per task | Yes, by default for git repos | Optional (`--spawn worktree`) | Not documented | Manual |
-| Cost | Free, MIT | Included with a Claude subscription | Free (AGPL); hosted tier is paid | Free |
+| | ccctl | Claude Code [Remote Control](https://code.claude.com/docs/en/remote-control) | Browser UIs such as [CloudCLI](https://github.com/siteboon/claudecodeui) | Tailnet phone UIs such as [deck](https://github.com/jinbe/deck) and [claude-code-remote](https://github.com/buckle42/claude-code-remote) | `tmux` over SSH |
+|---|---|---|---|---|---|
+| Where sessions run | Your machine | Your machine | Your machine, or a hosted tier | Your machine | Your machine |
+| Path to your sessions | Direct, over your tailnet | Through Anthropic's servers; the transcript is stored there | Direct (self-hosted) | Direct, over your tailnet | Direct, over SSH |
+| Sign-in needed | Your Tailscale login | A claude.ai subscription (API keys are not supported) | None beyond the tool's own | Any device on your tailnet | SSH key |
+| Several sessions at a glance | Grid of live terminals (1 to 6, resizes as you add) | Session list in the app or claude.ai/code | Session list and tabs | deck: a session list with a chat view (not the terminal UI); claude-code-remote: one tmux session | Panes, if you set them up |
+| "Needs input" signal | Amber pane header, tab count, chime | Mobile push notifications | Not documented | deck: web push to the phone; claude-code-remote: none | None |
+| Worktree per task | Yes, by default for git repos | Optional (`--spawn worktree`) | Not documented | deck: optional, asks first | Manual |
+| Cost | Free, MIT | Included with a Claude subscription | Free (AGPL); hosted tier is paid | Free; no license file | Free |
 
-Pick Remote Control if you want Anthropic's mobile app and push notifications, and are happy with a claude.ai login. Pick ccctl if you want the traffic to stay on your own tailnet, work with API-key auth, or watch several terminals side by side.
+Pick Remote Control if you want Anthropic's mobile app and push notifications, and are happy with a claude.ai login. Pick deck or claude-code-remote if you mostly check in from a phone. Pick ccctl if you want several real Claude Code terminals side by side on a desktop browser, each task in its own worktree, limited to your own Tailscale login, and back after a restart.
 
 ## Quickstart
 
