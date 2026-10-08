@@ -5,7 +5,7 @@ Thanks for helping. Bug reports, fixes, and focused features are welcome. By tak
 ## Before you start
 
 - For anything bigger than a small fix, open an issue first so we can agree on the approach.
-- ccctl is deliberately small: one binary, up to four sessions, Tailscale-only access. Changes that widen the trust boundary (new listeners, auth changes, weaker defaults) get the closest review.
+- ccctl is deliberately small: one binary, up to six sessions, Tailscale-only access. Changes that widen the trust boundary (new listeners, auth changes, weaker defaults) get the closest review.
 - Report security problems privately: see [SECURITY.md](SECURITY.md).
 
 ## Set up

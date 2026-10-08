@@ -68,6 +68,8 @@ Expected result: `ccctl status` prints the controller URL, for example `http://1
 
 Pick a task name and a repo. For git repos, ccctl creates a sibling worktree on its own branch, so parallel tasks do not edit the same files.
 
+To pick up an existing Claude Code session instead, choose **Resume by ID** and paste its ID or a whole `claude --resume <id>` command. ccctl shows the session's title, folder and last activity, then runs `claude --resume <id>` in the folder the session ran in. A session that is already open, in ccctl or in a terminal, cannot be opened twice.
+
 ![The Settings dialog: the repository folder that New session scans, and variables such as API keys added to every session you start.](docs/screenshots/settings.png)
 
 Settings holds the one folder that New session scans for repos and the environment variables (such as API keys) that every new session receives.
@@ -104,7 +106,7 @@ The macOS binaries are not signed or notarized. Downloading with `curl`, as abov
 
 1. Downloads the latest release, or the tag given with `--version vX.Y.Z`, anonymously, or with `$GITHUB_TOKEN` or `gh auth token` when one is available (this avoids GitHub's lower anonymous rate limit). With `--local`, it copies the running binary instead of downloading.
 2. Records the absolute path of `claude` from your shell as `claude_path`. launchd and systemd do not load your shell `PATH`.
-3. Writes the service and starts it:
+3. Writes the service and (re)starts it, so an upgrade takes effect at once:
    - **macOS:** a launchd user agent `~/Library/LaunchAgents/com.ryabinski-labs.ccctl.plist` with `KeepAlive`.
    - **Linux:** a systemd user unit `~/.config/systemd/user/ccctl.service` with `Restart=always`. Run `loginctl enable-linger $USER` to keep it running while you are logged out.
 
