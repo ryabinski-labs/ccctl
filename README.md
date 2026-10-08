@@ -53,14 +53,22 @@ Pick Remote Control if you want Anthropic's mobile app and push notifications, a
 On the host (the machine that runs Claude Code), with Tailscale running and `claude` logged in:
 
 ```sh
-# Pick your platform: ccctl_{darwin,linux}_{arm64,amd64}.tar.gz
-curl -fsSL -O https://github.com/ryabinski-labs/ccctl/releases/latest/download/ccctl_darwin_arm64.tar.gz
-tar xzf ccctl_darwin_arm64.tar.gz ccctl
-./ccctl install
+os=$(uname -s | tr A-Z a-z); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -fsSL https://github.com/ryabinski-labs/ccctl/releases/latest/download/ccctl_${os}_${arch}.tar.gz | tar xz ccctl
+./ccctl install && rm ccctl     # install copies itself to ~/.ccctl/bin; the download is no longer needed
 ~/.ccctl/bin/ccctl status
 ```
 
-Expected result: `ccctl status` prints the controller URL, for example `http://100.64.0.10:7681`. Open it from any device on your tailnet. On macOS, read [macOS firewall](#macos-firewall) if the page never loads.
+Expected result: `ccctl status` prints the controller URL, for example `http://100.64.0.10:7681`. Open it from any device on your tailnet.
+
+- **macOS:** if the page never loads, the firewall is holding the new binary; see [macOS firewall](#macos-firewall).
+- **Linux:** run `loginctl enable-linger $USER` once, or the service stops when you log out.
+
+### Upgrade or move to a new machine
+
+- **Upgrade from a release:** `~/.ccctl/bin/ccctl install` (add `--version vX.Y.Z` to pick one). It replaces the binary and restarts the service; live sessions are resumed.
+- **Build from source** (needs Go and Node 22 too): clone the repo and run `scripts/rebuild-restart.sh`; later, `scripts/rebuild-restart.sh --pull`. It builds, installs, restarts, and prints the URL.
+- **New machine:** run the Quickstart or the source build there. Settings (`~/.ccctl/config.toml`) are per machine; copy that file over to keep your repository folder and `[env]` variables.
 
 ### Start a session
 
