@@ -156,6 +156,9 @@ type LaunchRequest struct {
 	Prompt   string `json:"prompt"`
 	// Slot is the pane the user clicked; honored when free, else the lowest free slot is used.
 	Slot int `json:"slot"`
+	// ResumeID resumes a saved claude session (an ID or a pasted `claude --resume` command)
+	// in its own folder instead of starting fresh in Path.
+	ResumeID string `json:"resume_id"`
 }
 
 // Launch validates req and starts a fresh session in the lowest free slot.
@@ -187,6 +190,9 @@ func (m *Manager) Launch(req LaunchRequest) (Info, error) {
 	if err != nil {
 		return Info{}, invalid(err)
 	}
+	if strings.TrimSpace(req.ResumeID) != "" {
+		return m.resumeByIDLocked(slot, task, req)
+	}
 	dir, err := ValidatePath(config.Expand(m.opt.Home, strings.TrimSpace(req.Path)))
 	if err != nil {
 		return Info{}, invalid(err)
@@ -212,6 +218,32 @@ func (m *Manager) Launch(req LaunchRequest) (Info, error) {
 		info.Repo, info.Worktree, info.Branch, info.Cwd = filepath.Base(plan.Top), plan.Path, plan.Branch, plan.Cwd
 	}
 	return m.startLocked(info, req.Prompt, false)
+}
+
+// resumeByIDLocked starts `claude --resume <id>` in the folder the session was recorded in. m.mu held.
+func (m *Manager) resumeByIDLocked(slot int, task string, req LaunchRequest) (Info, error) {
+	if req.Prompt != "" || req.Worktree {
+		return Info{}, ValidationError{MsgResumeWithInput}
+	}
+	id, err := ParseSessionID(req.ResumeID)
+	if err != nil {
+		return Info{}, invalid(err)
+	}
+	if n := m.openSlotLocked(id); n != 0 {
+		return Info{}, ValidationError{MsgAlreadyOpen(id, n)}
+	}
+	t, err := FindTranscript(m.claudeConfigDir(), id)
+	if err != nil {
+		return Info{}, invalid(err)
+	}
+	dir, err := ValidatePath(t.Cwd)
+	if err != nil {
+		return Info{}, ValidationError{MsgTranscriptFolderGone(t.Cwd)}
+	}
+	if err := CheckClaude(m.opt.ClaudePath); err != nil {
+		return Info{}, invalid(err)
+	}
+	return m.startLocked(Info{Slot: slot, Task: task, Cwd: dir, Repo: filepath.Base(dir), SessionID: id}, "", true)
 }
 
 // startLocked spawns claude for info in info.Slot, replacing whatever was there. m.mu held.

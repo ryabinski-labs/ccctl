@@ -48,7 +48,7 @@ type Server struct {
 
 // Routes lists every registered pattern (SC-005-h).
 var Routes = []struct{ Method, Path string }{
-	{"GET", "/"}, {"GET", "/assets/x.js"}, {"GET", "/api/state"}, {"GET", "/api/repos"}, {"GET", "/api/inspect"},
+	{"GET", "/"}, {"GET", "/assets/x.js"}, {"GET", "/api/state"}, {"GET", "/api/repos"}, {"GET", "/api/inspect"}, {"GET", "/api/transcript"},
 	{"POST", "/api/sessions"}, {"POST", "/api/sessions/1/stop"}, {"POST", "/api/sessions/1/fresh"},
 	{"POST", "/api/sessions/1/close"}, {"POST", "/api/sessions/1/upload"}, {"GET", "/ws"},
 	{"GET", "/api/settings/env"}, {"PUT", "/api/settings/env/X"}, {"DELETE", "/api/settings/env/X"},
@@ -60,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/state", s.state)
 	mux.HandleFunc("GET /api/repos", s.repos)
 	mux.HandleFunc("GET /api/inspect", s.inspect)
+	mux.HandleFunc("GET /api/transcript", s.transcript)
 	mux.HandleFunc("POST /api/sessions", s.launch)
 	mux.HandleFunc("POST /api/sessions/{slot}/upload", s.upload)
 	mux.HandleFunc("POST /api/sessions/{slot}/{action}", s.action)
@@ -193,6 +194,16 @@ func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, in)
+}
+
+// transcript looks up a saved claude session by ID (or pasted resume command) for Resume by ID.
+func (s *Server) transcript(w http.ResponseWriter, r *http.Request) {
+	t, err := s.M.LookupTranscript(r.URL.Query().Get("id"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, 200, t)
 }
 
 func (s *Server) launch(w http.ResponseWriter, r *http.Request) {

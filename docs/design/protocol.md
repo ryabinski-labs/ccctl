@@ -30,7 +30,8 @@ interface SlotInfo {
 | GET | `/api/state` | – | `{host, login, max_sessions: 6, slots: (SlotInfo\|null)[6]}` | – |
 | GET | `/api/repos` | – | `{repos: [{name, path, display}]}` (display is `~/Documents/folio`) | – |
 | GET | `/api/inspect?path=P` | – | `{path, git: bool, worktree_allowed: bool, note: string}` | 400 `{error}` for bad path |
-| POST | `/api/sessions` | `{task, path, worktree: bool, prompt}` | 201 `{slot, info: SlotInfo}` | 400 `{error}` validation text; 409 `{error}` cap text |
+| GET | `/api/transcript?id=I` | – | `{session_id, cwd, title, branch, modified, open_slot}` for the claude transcript `~/.claude/projects/*/<id>.jsonl` (or under `CLAUDE_CONFIG_DIR`); `I` may be a bare ID or a pasted `claude --resume <id>` command; `open_slot` is 0 unless a slot is already running it | 400 `{error}` bad ID or not found |
+| POST | `/api/sessions` | `{task, path, worktree: bool, prompt, resume_id?}`; with `resume_id`, `path` is ignored, `worktree` and `prompt` must be empty, and claude starts with `--resume <id>` in the transcript's folder | 201 `{slot, info: SlotInfo}` | 400 `{error}` validation text; 409 `{error}` cap text |
 | POST | `/api/sessions/{slot}/stop` | – | 202 `{}` | 404 |
 | POST | `/api/sessions/{slot}/fresh` | – | 201 `{slot, info}` | 400/404 |
 | POST | `/api/sessions/{slot}/close` | – | 200 `{}` (slot becomes null; only exited/resume-failed) | 400/404 |
