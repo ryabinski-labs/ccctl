@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import { terminalBus } from '../lib/terminalBus';
 import { api, ApiError } from '../lib/api';
 import { handleShortcut } from '../lib/shortcuts';
-import { TEXT } from '../lib/types';
+import { AGENT_LABEL, TEXT, agentOf } from '../lib/types';
 import { useSessions } from '../stores/sessions';
 import AppIcon from './AppIcon.vue';
 import StateBadge from './StateBadge.vue';
@@ -14,6 +14,8 @@ const props = defineProps<{ slot: number }>();
 const store = useSessions();
 
 const info = computed(() => store.slots[props.slot - 1]);
+const agent = computed(() => agentOf(info.value));
+const agentLabel = computed(() => AGENT_LABEL[agent.value]);
 const maximized = computed(() => store.maximized === props.slot);
 const focused = computed(() => store.focusedSlot === props.slot);
 const showStarting = computed(() => info.value?.state === 'starting' && !store.hasOutput[props.slot - 1]);
@@ -103,12 +105,13 @@ function onBlur() {
     }"
     :data-slot="slot"
     :data-state="info?.state ?? 'free'"
-    :aria-label="info ? `Slot ${slot}: ${info.task}` : TEXT.free(slot)"
+    :aria-label="info ? `Slot ${slot}: ${info.task} (${agentLabel})` : TEXT.free(slot)"
   >
     <template v-if="info">
       <header class="phead" data-testid="pane-header">
         <span class="chip mono" aria-hidden="true">{{ slot }}</span>
         <span class="task mono" :title="info.task">{{ info.task }}</span>
+        <span class="agent" data-testid="pane-agent">{{ agentLabel }}</span>
         <span class="meta mono" :title="info.cwd">
           <span>{{ info.repo }}</span
           ><template v-if="info.branch"><span class="dim"> · </span>{{ info.branch }}</template>
@@ -187,7 +190,7 @@ function onBlur() {
 
         <div v-if="showStarting" class="starting" role="status">
           <span class="spinner" aria-hidden="true" />
-          <span class="mono">{{ TEXT.startingIn(info.cwd) }}</span>
+          <span class="mono">{{ TEXT.startingIn(agent, info.cwd) }}</span>
         </div>
 
         <div v-if="info.state === 'resume-failed'" class="failed" role="alert">
@@ -306,6 +309,22 @@ function onBlur() {
   white-space: nowrap;
   font-size: 12px;
   color: var(--ink-2);
+}
+.agent {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pane--wait .agent {
+  background: transparent;
+  color: var(--wait-fg);
+  box-shadow: inset 0 0 0 1px var(--wait-rule);
 }
 .pane--wait .meta {
   color: var(--wait-fg);

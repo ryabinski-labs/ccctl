@@ -1,8 +1,10 @@
 export type SessionState = 'starting' | 'running' | 'needs-input' | 'exited' | 'resume-failed';
+export type Agent = 'claude' | 'opencode';
 
 export interface SlotInfo {
   slot: number;
   task: string;
+  agent: Agent;
   cwd: string;
   repo: string;
   worktree: string;
@@ -30,6 +32,7 @@ export interface Inspection {
 
 export interface LaunchRequest {
   task: string;
+  agent?: Agent;
   path: string;
   worktree: boolean;
   prompt: string;
@@ -57,12 +60,19 @@ export interface Transcript {
 export const MAX_SESSIONS = 6;
 export const ACTIVE_STATES: SessionState[] = ['starting', 'running', 'needs-input'];
 
+export const AGENT_LABEL: Record<Agent, string> = {
+  claude: 'Claude Code',
+  opencode: 'OpenCode',
+};
+
 export const TEXT = {
   allSlotsInUse: `All ${MAX_SESSIONS} slots are in use. Stop or close a session first.`,
   notGit: 'Not a git repository: session runs in the folder itself.',
   taskRule: 'Task name must be 1 to 40 characters of a-z, 0-9 or -, and unique among open sessions.',
   stopConfirm: (task: string) => `Stop ${task}? The worktree and branch are kept.`,
-  startingIn: (path: string) => `Starting claude in ${path}`,
+  startingIn: (agent: Agent, path: string) => `Starting ${AGENT_LABEL[agent]} in ${path}`,
+  promptPlaceholder: (agent: Agent) => `What should ${AGENT_LABEL[agent]} work on?`,
+  resumeOpenCodeOnly: 'Resume by ID is Claude Code only in this release.',
   free: (slot: number) => `Slot ${slot} is free`,
 } as const;
 
@@ -73,3 +83,7 @@ export const STATE_LABEL: Record<SessionState, string> = {
   exited: 'Exited',
   'resume-failed': 'Resume failed',
 };
+
+export function agentOf(info: Pick<SlotInfo, 'agent'> | null | undefined): Agent {
+  return info?.agent === 'opencode' ? 'opencode' : 'claude';
+}

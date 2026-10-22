@@ -7,10 +7,12 @@ upgrade must carry `Origin` equal to `http://<Host>` (WS: Origin required; POST:
 
 ```ts
 type State = 'starting' | 'running' | 'needs-input' | 'exited' | 'resume-failed'
+type Agent = 'claude' | 'opencode'
 interface SlotInfo {
   slot: number            // 1..6
   task: string
-  cwd: string             // working directory of claude
+  agent: Agent            // which CLI runs in the slot
+  cwd: string             // working directory of the agent
   repo: string            // display folder name, e.g. "folio"
   worktree: string        // worktree path or "" when none
   branch: string          // "ctl/<task>" or "" when none
@@ -31,7 +33,7 @@ interface SlotInfo {
 | GET | `/api/repos` | – | `{repos: [{name, path, display}]}` (display is `~/Documents/folio`) | – |
 | GET | `/api/inspect?path=P` | – | `{path, git: bool, worktree_allowed: bool, note: string}` | 400 `{error}` for bad path |
 | GET | `/api/transcript?id=I` | – | `{session_id, cwd, title, last_prompt, branch, modified, cwd_missing, open_slot, external_pid}` for the claude transcript `~/.claude/projects/*/<id>.jsonl` (or under `CLAUDE_CONFIG_DIR`); `I` may be a bare ID or a pasted `claude --resume <id>` command; `title` is the custom title, else the AI title; `open_slot` is the slot already running it and `external_pid` a live claude outside ccctl that has it open (from `~/.claude/sessions/<pid>.json`), each 0 when none | 400 `{error}` bad ID or not found |
-| POST | `/api/sessions` | `{task, path, worktree: bool, prompt, resume_id?}`; with `resume_id`, `path` is ignored, `worktree` and `prompt` must be empty, and claude starts with `--resume <id>` in the transcript's folder; refused when the session is open in a slot or another terminal, or its folder is gone | 201 `{slot, info: SlotInfo}` | 400 `{error}` validation text; 409 `{error}` cap text |
+| POST | `/api/sessions` | `{task, agent?: "claude"\|"opencode", path, worktree: bool, prompt, resume_id?}`; `agent` defaults to `claude`; with `resume_id`, `agent` must be or default to `claude` (Resume by ID is Claude Code only), `path` is ignored, `worktree` and `prompt` must be empty, and claude starts with `--resume <id>` in the transcript's folder; refused when the session is open in a slot or another terminal, or its folder is gone | 201 `{slot, info: SlotInfo}` | 400 `{error}` validation text; 409 `{error}` cap text |
 | POST | `/api/sessions/{slot}/stop` | – | 202 `{}` | 404 |
 | POST | `/api/sessions/{slot}/fresh` | – | 201 `{slot, info}` | 400/404 |
 | POST | `/api/sessions/{slot}/close` | – | 200 `{}` (slot becomes null; only exited/resume-failed) | 400/404 |
@@ -40,7 +42,7 @@ interface SlotInfo {
 ## WebSocket `GET /ws`
 
 Server → client:
-- Text `{"type":"hello","host","login","slots":[...6]}` first.
+- Text `{"type":"hello","host","login","slots":[...6]}` first. Each slot carries `agent`; a version 1 state file loads with `agent: "claude"`.
 - Then, per live slot, one binary replay frame: `[0x02, slot, ...bytes]` (client resets that terminal, writes bytes).
 - Binary output: `[0x01, slot, ...bytes]`.
 - Text `{"type":"slot","slot":n,"info":SlotInfo|null}` on any change (state, launch, close).

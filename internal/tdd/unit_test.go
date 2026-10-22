@@ -213,7 +213,7 @@ func TestSc009DStateFileDurabilityAndVersionGuard(t *testing.T) {
 		t.Errorf("mode = %v", fi.Mode().Perm())
 	}
 	f, err := st.Load()
-	if err != nil || f.Version != 1 || f.Slots[0].Task != "old" {
+	if err != nil || f.Version != state.Version || f.Slots[0].Task != "old" || f.Slots[0].Agent != "claude" {
 		t.Fatalf("load = %+v %v", f, err)
 	}
 	before, _ := os.ReadFile(st.Path)
@@ -225,9 +225,9 @@ func TestSc009DStateFileDurabilityAndVersionGuard(t *testing.T) {
 	if string(before) != string(after) {
 		t.Fatal("interrupted save changed the file")
 	}
-	os.WriteFile(st.Path, []byte(`{"version":2,"slots":[]}`), 0o600)
-	if _, err := st.Load(); err == nil || err.Error() != "State file version 2 is newer than this ccctl supports." {
-		t.Fatalf("version 2: %v", err)
+	os.WriteFile(st.Path, []byte(`{"version":3,"slots":[]}`), 0o600)
+	if _, err := st.Load(); err == nil || err.Error() != "State file version 3 is newer than this ccctl supports." {
+		t.Fatalf("version 3: %v", err)
 	}
 }
 

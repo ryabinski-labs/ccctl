@@ -4,6 +4,7 @@ Notable changes to ccctl. Release binaries and their notes are on the [Releases 
 
 ## Unreleased
 
+- Run OpenCode 2.1.3 or newer alongside Claude Code. New session gains an **Agent** choice (Claude Code or OpenCode); both share the six slots, worktrees, uploads, scrollback, stop/close, and restart resume. `ccctl install` records `opencode_path` and writes the ccctl needs-input plugin to `~/.config/opencode/plugins/ccctl.js` (or `$OPENCODE_CONFIG_DIR/plugins/`), and `ccctl uninstall` removes it. Resume by ID stays Claude Code only; OpenCode sessions resume from the ID ccctl created.
 - `ccctl install` on Linux now restarts the service, so an upgrade takes effect. Before, `systemctl --user enable --now` left the old binary running.
 - Settings keeps a repository folder you type before the saved one has loaded. Before, the loaded value replaced what you typed, and Save folder stayed disabled.
 - `scripts/rebuild-restart.sh` builds the current checkout and installs and restarts it as the service, on a new host or an existing one.

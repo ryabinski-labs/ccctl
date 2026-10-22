@@ -40,8 +40,7 @@ func RepoRoot() string {
 	return filepath.Join(filepath.Dir(f), "..", "..")
 }
 
-// Binaries builds ccctl and fakeclaude once per test process.
-func Binaries(t testing.TB) (ccctl, fake string) {
+func buildBinaries(t testing.TB) {
 	t.Helper()
 	buildOnce.Do(func() {
 		d, err := os.MkdirTemp("", "ccctl-bin")
@@ -50,7 +49,11 @@ func Binaries(t testing.TB) (ccctl, fake string) {
 			return
 		}
 		binDir = d
-		for pkg, out := range map[string]string{"./cmd/ccctl": "ccctl", "./internal/testutil/fakeclaude": "fakeclaude"} {
+		for pkg, out := range map[string]string{
+			"./cmd/ccctl":                      "ccctl",
+			"./internal/testutil/fakeclaude":   "fakeclaude",
+			"./internal/testutil/fakeopencode": "fakeopencode",
+		} {
 			cmd := exec.Command("go", "build", "-o", filepath.Join(d, out), pkg)
 			cmd.Dir = RepoRoot()
 			if b, err := cmd.CombinedOutput(); err != nil {
@@ -62,7 +65,20 @@ func Binaries(t testing.TB) (ccctl, fake string) {
 	if buildError != "" {
 		t.Fatal(buildError)
 	}
+}
+
+// Binaries builds ccctl and fakeclaude once per test process.
+func Binaries(t testing.TB) (ccctl, fake string) {
+	t.Helper()
+	buildBinaries(t)
 	return filepath.Join(binDir, "ccctl"), filepath.Join(binDir, "fakeclaude")
+}
+
+// FakeOpenCode returns the fake OpenCode binary.
+func FakeOpenCode(t testing.TB) string {
+	t.Helper()
+	buildBinaries(t)
+	return filepath.Join(binDir, "fakeopencode")
 }
 
 // ---- fake Tailscale ----
@@ -151,37 +167,40 @@ func Git(dir string, args ...string) (string, error) {
 // ---- controller harness ----
 
 type Opts struct {
-	Interval    time.Duration
-	Modes       map[int]string // FAKECLAUDE_MODE_<slot>
-	Mode        string
-	StopGrace   time.Duration
-	ResumeGrace time.Duration
-	ClaudePath  string // override (default fakeclaude)
-	Setup       func(home string)
-	TS          *FakeTS
-	NoWaitBind  bool
-	Allowed     []string
-	ScanTimeout time.Duration // repo scan limit (default 10 s)
+	Interval     time.Duration
+	Modes        map[int]string // FAKECLAUDE_MODE_<slot>
+	Mode         string
+	StopGrace    time.Duration
+	ResumeGrace  time.Duration
+	ClaudePath   string // override (default fakeclaude)
+	OpenCodePath string // override (default fakeopencode)
+	Setup        func(home string)
+	TS           *FakeTS
+	NoWaitBind   bool
+	Allowed      []string
+	ScanTimeout  time.Duration // repo scan limit (default 10 s)
 }
 
 type H struct {
-	T       testing.TB
-	App     *app.App
-	TS      *FakeTS
-	Home    string
-	Root    string // HOME/Documents
-	FakeLog string
-	Log     *LogBuf
-	CCCTL   string
-	Sock    string
-	cancel  context.CancelFunc
-	done    chan struct{}
+	T               testing.TB
+	App             *app.App
+	TS              *FakeTS
+	Home            string
+	Root            string // HOME/Documents
+	FakeLog         string
+	FakeOpenCodeLog string
+	Log             *LogBuf
+	CCCTL           string
+	Sock            string
+	cancel          context.CancelFunc
+	done            chan struct{}
 }
 
 // Start runs a controller with fakeclaude and a fake Tailscale on 127.0.0.1:0.
 func Start(t testing.TB, o Opts) *H {
 	t.Helper()
 	ccctl, fake := Binaries(t)
+	fakeOpenCode := FakeOpenCode(t)
 	home := t.TempDir()
 	home, _ = filepath.EvalSymlinks(home)
 	root := filepath.Join(home, "Documents")
@@ -196,15 +215,25 @@ func Start(t testing.TB, o Opts) *H {
 		o.Interval = 50 * time.Millisecond
 	}
 	fakeLog := filepath.Join(home, "fakeclaude")
-	env := append(os.Environ(), "FAKECLAUDE_LOG="+fakeLog, "FAKECLAUDE_MODE="+o.Mode)
+	fakeOpenCodeLog := filepath.Join(home, "fakeopencode")
+	env := append(os.Environ(), "FAKECLAUDE_LOG="+fakeLog, "FAKECLAUDE_MODE="+o.Mode,
+		"FAKEOPENCODE_LOG="+fakeOpenCodeLog, "FAKEOPENCODE_MODE="+o.Mode)
 	for s, m := range o.Modes {
-		env = append(env, fmt.Sprintf("FAKECLAUDE_MODE_%d=%s", s, m))
+		env = append(env, fmt.Sprintf("FAKECLAUDE_MODE_%d=%s", s, m), fmt.Sprintf("FAKEOPENCODE_MODE_%d=%s", s, m))
 	}
 	cfg := config.Config{Port: 0, AllowedLogins: o.Allowed}
-	cfg.ApplyDefaults(home, func(string) (string, error) { return fake, nil })
+	cfg.ApplyDefaults(home, func(name string) (string, error) {
+		if name == "opencode" {
+			return fakeOpenCode, nil
+		}
+		return fake, nil
+	})
 	cfg.Port = 0 // ephemeral, never the real 7681
 	if o.ClaudePath != "" {
 		cfg.ClaudePath = o.ClaudePath
+	}
+	if o.OpenCodePath != "" {
+		cfg.OpenCodePath = o.OpenCodePath
 	}
 	sockDir, _ := os.MkdirTemp("", "cc")
 	t.Cleanup(func() { os.RemoveAll(sockDir) })
@@ -218,7 +247,7 @@ func Start(t testing.TB, o Opts) *H {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	h := &H{Sock: filepath.Join(sockDir, "s.sock"), T: t, App: a, TS: o.TS, Home: home, Root: root, FakeLog: fakeLog, Log: lb, CCCTL: ccctl, cancel: cancel, done: make(chan struct{})}
+	h := &H{Sock: filepath.Join(sockDir, "s.sock"), T: t, App: a, TS: o.TS, Home: home, Root: root, FakeLog: fakeLog, FakeOpenCodeLog: fakeOpenCodeLog, Log: lb, CCCTL: ccctl, cancel: cancel, done: make(chan struct{})}
 	go func() { a.Run(ctx); close(h.done) }()
 	t.Cleanup(h.Stop)
 	if !o.NoWaitBind {
@@ -261,8 +290,13 @@ func (h *H) Do(method, path string, body any) (int, []byte) {
 
 // Launch launches a session and fails the test unless it is accepted.
 func (h *H) Launch(task, path string, worktree bool, prompt string) session.Info {
+	return h.LaunchAgent(task, path, worktree, prompt, session.AgentClaude)
+}
+
+// LaunchAgent launches a session of agent and fails the test unless it is accepted.
+func (h *H) LaunchAgent(task, path string, worktree bool, prompt string, agent session.Agent) session.Info {
 	h.T.Helper()
-	code, b := h.Do("POST", "/api/sessions", session.LaunchRequest{Task: task, Path: path, Worktree: worktree, Prompt: prompt})
+	code, b := h.Do("POST", "/api/sessions", session.LaunchRequest{Task: task, Agent: string(agent), Path: path, Worktree: worktree, Prompt: prompt})
 	if code != 201 {
 		h.T.Fatalf("launch %s: %d %s", task, code, b)
 	}
@@ -272,8 +306,13 @@ func (h *H) Launch(task, path string, worktree bool, prompt string) session.Info
 }
 
 // Invocations returns fakeclaude invocation records.
-func (h *H) Invocations() []map[string]any {
-	b, _ := os.ReadFile(filepath.Join(h.FakeLog, "invocations.jsonl"))
+func (h *H) Invocations() []map[string]any { return readInvocations(h.FakeLog) }
+
+// OpenCodeInvocations returns fakeopencode invocation records.
+func (h *H) OpenCodeInvocations() []map[string]any { return readInvocations(h.FakeOpenCodeLog) }
+
+func readInvocations(dir string) []map[string]any {
+	b, _ := os.ReadFile(filepath.Join(dir, "invocations.jsonl"))
 	var out []map[string]any
 	for _, l := range strings.Split(string(b), "\n") {
 		var m map[string]any
@@ -287,6 +326,12 @@ func (h *H) Invocations() []map[string]any {
 // InputLog returns the bytes fakeclaude in slot read.
 func (h *H) InputLog(slot int) []byte {
 	b, _ := os.ReadFile(filepath.Join(h.FakeLog, fmt.Sprintf("input-%d.bin", slot)))
+	return b
+}
+
+// OpenCodeInputLog returns the bytes fakeopencode in slot read.
+func (h *H) OpenCodeInputLog(slot int) []byte {
+	b, _ := os.ReadFile(filepath.Join(h.FakeOpenCodeLog, fmt.Sprintf("input-%d.bin", slot)))
 	return b
 }
 

@@ -56,6 +56,7 @@ function info(slot: number, state: SessionState, task = `task-${slot}`): SlotInf
   return {
     slot,
     task,
+    agent: 'claude',
     cwd: `/h/repo-wt-${task}`,
     repo: 'repo',
     worktree: `/h/repo-wt-${task}`,

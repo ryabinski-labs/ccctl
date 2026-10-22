@@ -24,7 +24,11 @@ type Config struct {
 	Port          int      `toml:"port"`
 	AllowedLogins []string `toml:"allowed_logins"`
 	ClaudePath    string   `toml:"claude_path"`
-	TailscalePath string   `toml:"tailscale_path"`
+	OpenCodePath  string   `toml:"opencode_path"`
+	// OpenCodeConfigDir is the OpenCode config directory whose plugins folder
+	// contains ccctl.js. Empty means ~/.config/opencode.
+	OpenCodeConfigDir string `toml:"opencode_config_dir"`
+	TailscalePath     string `toml:"tailscale_path"`
 	// Env is added to every Claude session's environment (for example
 	// GEMINI_API_KEY). It is re-read at each launch, so edits apply to the next
 	// session without a restart. Values are never logged.
@@ -60,6 +64,15 @@ func (c *Config) ApplyDefaults(home string, lookPath func(string) (string, error
 		}
 	}
 	c.ClaudePath = Expand(home, c.ClaudePath)
+	if c.OpenCodePath == "" {
+		if p, err := lookPath("opencode"); err == nil {
+			c.OpenCodePath = p
+		} else {
+			c.OpenCodePath = filepath.Join(home, ".local", "bin", "opencode")
+		}
+	}
+	c.OpenCodePath = Expand(home, c.OpenCodePath)
+	c.OpenCodeConfigDir = Expand(home, c.OpenCodeConfigDir)
 	c.TailscalePath = Expand(home, c.TailscalePath)
 }
 

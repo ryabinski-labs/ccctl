@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -58,14 +59,23 @@ func main() {
 		})
 	}
 	fakeLog := filepath.Join(dir, "fakeclaude")
+	fakeOpenCodeLog := filepath.Join(dir, "fakeopencode")
+	logPath := filepath.Join(dir, "controller.log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	must(err)
 	cfg := config.Config{Port: 0}
-	cfg.ApplyDefaults(home, func(string) (string, error) { return filepath.Join(binDir, "fakeclaude"), nil })
+	cfg.ApplyDefaults(home, func(name string) (string, error) {
+		if name == "opencode" {
+			return filepath.Join(binDir, "fakeopencode"), nil
+		}
+		return filepath.Join(binDir, "fakeclaude"), nil
+	})
 	cfg.Port = 0 // ephemeral, never the real 7681
-	env := append(os.Environ(), "FAKECLAUDE_LOG="+fakeLog, "HOME="+home)
+	env := append(os.Environ(), "FAKECLAUDE_LOG="+fakeLog, "FAKEOPENCODE_LOG="+fakeOpenCodeLog, "HOME="+home)
 	a, err := app.New(app.Options{
 		Home: home, Config: cfg, TS: testutil.NewFakeTS(), Interval: 100 * time.Millisecond, ScanTimeout: *scanTimeout,
 		CCCTLPath: filepath.Join(binDir, "ccctl"), Env: env, Static: web.Dist(),
-		Log:      slog.New(slog.NewJSONHandler(os.Stderr, nil)),
+		Log:      slog.New(slog.NewJSONHandler(io.MultiWriter(os.Stderr, logFile), nil)),
 		SockPath: filepath.Join(dir, "s.sock"),
 	})
 	must(err)
@@ -75,7 +85,7 @@ func main() {
 		for a.Addr() == "" {
 			time.Sleep(10 * time.Millisecond)
 		}
-		b, _ := json.Marshal(map[string]string{"url": "http://" + a.Addr(), "dir": dir})
+		b, _ := json.Marshal(map[string]string{"url": "http://" + a.Addr(), "dir": dir, "log": logPath})
 		fmt.Println(string(b))
 	}()
 	must(a.Run(ctx))
