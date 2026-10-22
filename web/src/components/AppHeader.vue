@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useSessions } from '../stores/sessions';
+import { terminalBus } from '../lib/terminalBus';
 import { TEXT } from '../lib/types';
 import AppIcon from './AppIcon.vue';
 
@@ -57,6 +58,12 @@ const summary = computed(() => {
 });
 
 const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next free slot' : TEXT.allSlotsInUse));
+
+// Re-fit and redraw the terminals without dropping their sessions, for when a
+// pane comes back from sleep or a browser resize with clipped or stale rows.
+function refreshViews() {
+  terminalBus.refreshAll();
+}
 </script>
 
 <template>
@@ -140,6 +147,17 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
       >
         <AppIcon :name="store.muted ? 'bell-off' : 'bell'" :size="16" />Chime
         <span class="pill" aria-hidden="true">{{ store.muted ? 'Off' : 'On' }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="btn btn--ghost btn--sm refresh"
+        data-testid="refresh-view"
+        aria-label="Refresh terminal views"
+        title="Refresh the view (re-fit and redraw every terminal)"
+        @click="refreshViews"
+      >
+        <AppIcon name="refresh" :size="16" />
       </button>
 
       <button
@@ -241,6 +259,12 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
   gap: 4px;
 }
 .toggle {
+  color: var(--ink-2);
+}
+.refresh {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
   color: var(--ink-2);
 }
 .pill {
