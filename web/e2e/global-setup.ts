@@ -15,6 +15,7 @@ export default function globalSetup() {
     ['e2eserver', './internal/e2e/cmd/e2eserver'],
     ['ccctl', './cmd/ccctl'],
     ['fakeclaude', './internal/testutil/fakeclaude'],
+    ['fakeopencode', './internal/testutil/fakeopencode'],
   ]) {
     execFileSync('go', ['build', '-o', join(bin, out), pkg], { cwd: repoRoot, stdio: 'inherit' });
   }

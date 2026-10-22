@@ -1,17 +1,17 @@
 # ccctl
 
-**ccctl is a web controller for up to six live [Claude Code](https://docs.claude.com/en/docs/claude-code) sessions on one machine, reached privately over Tailscale.**
+**ccctl is a web controller for up to six live [Claude Code](https://docs.claude.com/en/docs/claude-code) and [OpenCode](https://opencode.ai) sessions on one machine, reached privately over Tailscale.**
 
 > Unofficial community project. It is not affiliated with, endorsed by, or sponsored by Anthropic. "Claude" and "Claude Code" are trademarks of Anthropic.
 
-ccctl is built for developers who run several Claude Code sessions in parallel on an always-on Mac or Linux host. Open `http://TAILSCALE_IP:7681/` from any device on your tailnet and get a grid of real `claude` terminals that grows from one pane to six as you start sessions. The problem it solves: a session blocked on a prompt in a terminal you are not looking at. You watch them all, type into any of them, and see at a glance which one is waiting for you.
+ccctl is built for developers who run several Claude Code or OpenCode sessions in parallel on an always-on Mac or Linux host. Open `http://TAILSCALE_IP:7681/` from any device on your tailnet and get a grid of real agent terminals that grows from one pane to six as you start sessions. The problem it solves: a session blocked on a prompt in a terminal you are not looking at. You watch them all, type into any of them, and see at a glance which one is waiting for you.
 
 ## At a glance
 
 | | |
 |---|---|
-| **What it is** | One Go binary (`ccctl`) with an embedded Vue 3 + xterm.js web UI, run as a background service on the host that runs Claude Code. |
-| **Who it is for** | People who run several Claude Code sessions in parallel on a Mac or Linux box (a Mac mini, a home server) and want to check on them from a laptop or desktop browser (the page needs a window at least 1024 px wide; phone layouts are not supported). |
+| **What it is** | One Go binary (`ccctl`) with an embedded Vue 3 + xterm.js web UI, run as a background service on the host that runs Claude Code or OpenCode. |
+| **Who it is for** | People who run several Claude Code or OpenCode sessions in parallel on a Mac or Linux box (a Mac mini, a home server) and want to check on them from a laptop or desktop browser (the page needs a window at least 1024 px wide; phone layouts are not supported). |
 | **Problem it solves** | Parallel agent sessions sit blocked on a prompt in a terminal you are not looking at. ccctl shows all of them in one page and flags the one that needs you: an amber pane header, a tab-title count, and an optional chime. |
 | **Outcome** | Start, watch, and answer up to six sessions from any device on your tailnet, with each task isolated in its own git worktree. |
 | **Status** | Early (`v0.1.x`). Used daily by its author. Expect rough edges and breaking changes. |
@@ -24,6 +24,7 @@ ccctl is built for developers who run several Claude Code sessions in parallel o
 ### Use it when
 
 - Claude Code is installed and logged in on one always-on machine, and you want to drive it from other devices.
+- OpenCode 2.1.3 or newer is installed and logged in on that machine if you want to run OpenCode panes.
 - You already use Tailscale, and "reachable only on my tailnet" is the access model you want.
 
 ### Do not use it when
@@ -74,9 +75,9 @@ Expected result: `ccctl status` prints the controller URL, for example `http://1
 
 ![The New session dialog: a task name, a searchable list of repos under your repository folder, an "Isolate in a git worktree" switch, and an optional first prompt.](docs/screenshots/new-session.png)
 
-Pick a task name and a repo. For git repos, ccctl creates a sibling worktree on its own branch, so parallel tasks do not edit the same files.
+Pick a task name, a repo, and an agent: **Claude Code** or **OpenCode**. For git repos, ccctl creates a sibling worktree on its own branch, so parallel tasks do not edit the same files. The last agent you chose is remembered per browser.
 
-To pick up an existing Claude Code session instead, choose **Resume by ID** and paste its ID or a whole `claude --resume <id>` command. ccctl shows the session's title, folder and last activity, then runs `claude --resume <id>` in the folder the session ran in. A session that is already open, in ccctl or in a terminal, cannot be opened twice.
+To pick up an existing Claude Code session instead, choose **Resume by ID** and paste its ID or a whole `claude --resume <id>` command. ccctl shows the session's title, folder and last activity, then runs `claude --resume <id>` in the folder the session ran in. A session that is already open, in ccctl or in a terminal, cannot be opened twice. Resume by ID is Claude Code only in this release; OpenCode sessions resume automatically after a controller restart from the ID ccctl created.
 
 ![The Settings dialog: the repository folder that New session scans, and variables such as API keys added to every session you start.](docs/screenshots/settings.png)
 
@@ -92,17 +93,17 @@ Settings holds the one folder that New session scans for repos and the environme
 ## How it works
 
 - **One binary.** `ccctl` is a Go program with the Vue 3 + xterm.js frontend embedded in it.
-- **Sessions.** Each session is `claude --dangerously-skip-permissions --session-id UUID --settings FILE [prompt]` running in its own PTY. For git repos, each task gets its own worktree at `<repo>-wt-<task>` on branch `ctl/<task>`, created from HEAD. Worktrees and branches are never removed by ccctl.
-- **Needs input.** Claude Code's `Notification` and `Stop` hooks call `ccctl hook --slot N` over `~/.ccctl/ccctl.sock`. The pane header turns amber, the tab title shows a count, and a chime plays (you can mute it).
-- **Files and images.** Paste a file or screenshot onto a pane, drop one on it, or use the paperclip button in the pane header. ccctl saves it on the host in `~/.ccctl/uploads` (up to 25 MB each; ccctl removes its own uploads after 14 days and refuses new ones once the folder passes 1 GB) and types its path into the session, which is how Claude Code attaches an image. Pasting text works as in any terminal.
-- **Restarts.** Live sessions are recorded in `~/.ccctl/state.json` and resumed with `claude --resume` when ccctl starts again.
+- **Sessions.** A Claude Code session is `claude --dangerously-skip-permissions --session-id UUID --settings FILE [prompt]`; an OpenCode session is `opencode --session UUID --auto [--prompt TEXT]`. Each runs in its own PTY. For git repos, each task gets its own worktree at `<repo>-wt-<task>` on branch `ctl/<task>`, created from HEAD. Worktrees and branches are never removed by ccctl.
+- **Needs input.** Claude Code's `Notification` and `Stop` hooks call `ccctl hook --slot N` over `~/.ccctl/ccctl.sock`. OpenCode reports `permission.asked` and `session.idle` through `~/.config/opencode/plugins/ccctl.js`, which `ccctl install` writes and `ccctl uninstall` removes. The pane header turns amber, the tab title shows a count, and a chime plays (you can mute it).
+- **Files and images.** Paste a file or screenshot onto a pane, drop one on it, or use the paperclip button in the pane header. ccctl saves it on the host in `~/.ccctl/uploads` (up to 25 MB each; ccctl removes its own uploads after 14 days and refuses new ones once the folder passes 1 GB) and types its path into the session, which is how the agent attaches an image. Pasting text works as in any terminal.
+- **Restarts.** Live sessions are recorded in `~/.ccctl/state.json` (version 2, with each pane's `agent`) and resumed with `claude --resume` or `opencode --session` when ccctl starts again.
 - **Scrollback.** Each session keeps its last 1 MiB of output in memory and replays it when a browser connects.
 
 ## Install
 
 ### Requirements
 
-Tailscale running on the host and on the viewing device, Claude Code installed and logged in on the host, and git 2.20 or newer. Linux hosts need systemd user services.
+Tailscale running on the host and on the viewing device, Claude Code installed and logged in on the host, and git 2.20 or newer. OpenCode 2.1.3 or newer is optional: install it and run `opencode auth login` if you want OpenCode panes. Linux hosts need systemd user services.
 
 ### Install
 
@@ -113,14 +114,14 @@ The macOS binaries are not signed or notarized. Downloading with `curl`, as abov
 `ccctl install` does the following:
 
 1. Downloads the latest release, or the tag given with `--version vX.Y.Z`, anonymously, or with `$GITHUB_TOKEN` or `gh auth token` when one is available (this avoids GitHub's lower anonymous rate limit). With `--local`, it copies the running binary instead of downloading.
-2. Records the absolute path of `claude` from your shell as `claude_path`. launchd and systemd do not load your shell `PATH`.
+2. Records the absolute path of `claude` from your shell as `claude_path`. If `opencode` is on PATH, it records `opencode_path` too and writes the ccctl OpenCode plugin to `~/.config/opencode/plugins/ccctl.js` (or `$OPENCODE_CONFIG_DIR/plugins/`). If OpenCode was already running, restart its background server once (`opencode service restart`) so it loads the plugin. launchd and systemd do not load your shell `PATH`.
 3. Writes the service and (re)starts it, so an upgrade takes effect at once:
    - **macOS:** a launchd user agent `~/Library/LaunchAgents/com.ryabinski-labs.ccctl.plist` with `KeepAlive`.
    - **Linux:** a systemd user unit `~/.config/systemd/user/ccctl.service` with `Restart=always`. Run `loginctl enable-linger $USER` to keep it running while you are logged out.
 
 The service gets your install-time `PATH`, so Claude's tools find `git`, `go`, `node`, and the rest.
 
-To roll back, run `ccctl install --version <previous tag>`. `ccctl uninstall` removes the service only. It keeps `~/.ccctl` and every worktree.
+To roll back, run `ccctl install --version <previous tag>`. A build before OpenCode support refuses the version 2 state file: stop the sessions, move `~/.ccctl/state.json` aside, then install the older tag. `ccctl uninstall` removes the service and ccctl's OpenCode plugin only. It keeps `~/.ccctl` and every worktree.
 
 **Repository folder:** nothing is scanned until you set one. Open Settings, enter the folder that holds your repos (for example `~/projects`), and press Save folder. New session then lists only the git repos under it. You can always type any folder with "Use a custom path".
 
@@ -171,13 +172,15 @@ Exit codes: 0 success, 1 runtime error, 2 usage error, 3 Tailscale not running.
 | `port` | `7681` | HTTP port, bound only on the host's Tailscale IPv4. |
 | `allowed_logins` | the host node's Tailscale login | Tailscale logins allowed to use the controller. |
 | `claude_path` | recorded by `ccctl install` | Absolute path of the `claude` binary. |
+| `opencode_path` | recorded by `ccctl install` when found, else `opencode` on PATH or `~/.local/bin/opencode` | Absolute path of the `opencode` binary. OpenCode 2.1.3 or newer. |
+| `opencode_config_dir` | `~/.config/opencode` | OpenCode config directory whose `plugins/ccctl.js` ccctl installs. Set it here or in `$OPENCODE_CONFIG_DIR` before `ccctl install`. |
 | `tailscale_path` | `tailscale` on PATH, else `/Applications/Tailscale.app/Contents/MacOS/Tailscale` | Tailscale CLI. |
 
 State lives in `~/.ccctl/state.json` (0600). Logs are JSON lines in `~/.ccctl/logs/`, rotated at 10 MB with 7 files kept. Terminal output is never written to disk.
 
 ## Security notes
 
-- **Every session runs with `--dangerously-skip-permissions`.** Anything a session decides to run executes as the host user, without asking. Worktrees isolate the files each task edits, but not the machine.
+- **Every session runs with `--dangerously-skip-permissions` (Claude Code) or `--auto` (OpenCode).** Anything a session decides to run executes as the host user, without asking. Worktrees isolate the files each task edits, but not the machine.
 - **Plain HTTP on the Tailscale IP.** WireGuard encrypts the network path, but there is no TLS.
 - **Access checks.** Every HTTP request and WebSocket upgrade is checked against `allowed_logins` with Tailscale WhoIs. Anyone else gets HTTP 403, and the refusal is logged as `auth_denied`. WebSocket upgrades must also carry the controller's own `Origin`, and requests must name the controller's own host.
 - **Tailscale down.** When Tailscale stops, the controller stops listening, keeps your sessions running, and starts listening again when Tailscale returns.

@@ -14,10 +14,36 @@ import (
 
 // Spec messages (§5), verbatim.
 const (
-	MsgTaskName   = "Task name must be 1 to 40 characters of a-z, 0-9 or -, and unique among open sessions."
-	MsgNotGitRepo = "Not a git repository: session runs in the folder itself."
-	MaxPromptLen  = 10000
+	MsgTaskName       = "Task name must be 1 to 40 characters of a-z, 0-9 or -, and unique among open sessions."
+	MsgNotGitRepo     = "Not a git repository: session runs in the folder itself."
+	MaxPromptLen      = 10000
+	MsgBadAgent       = "Agent must be claude or opencode."
+	MsgOpenCodeResume = "Resume by ID is Claude Code only in this release."
 )
+
+// Agent is the coding agent that runs in a slot.
+type Agent string
+
+const (
+	AgentClaude   Agent = "claude"
+	AgentOpenCode Agent = "opencode"
+)
+
+// NormalizeAgent maps an empty agent to Claude (the pre-existing behavior) and
+// rejects any other value.
+func NormalizeAgent(s string) (Agent, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", string(AgentClaude):
+		return AgentClaude, nil
+	case string(AgentOpenCode):
+		return AgentOpenCode, nil
+	default:
+		return "", errors.New(MsgBadAgent)
+	}
+}
+
+// Valid reports whether a is one of the two supported agents.
+func (a Agent) Valid() bool { return a == AgentClaude || a == AgentOpenCode }
 
 // MsgAllInUse is the launch refusal when every slot is active.
 var MsgAllInUse = fmt.Sprintf("All %d slots are in use. Stop or close a session first.", config.MaxSessions)
@@ -28,6 +54,10 @@ func MsgWorktreeExists(task string) string {
 }
 func MsgClaudeNotFound(p string) string {
 	return fmt.Sprintf("Claude Code was not found at %s. Set claude_path in ~/.ccctl/config.toml.", p)
+}
+
+func MsgOpenCodeNotFound(p string) string {
+	return fmt.Sprintf("OpenCode was not found at %s. Set opencode_path in ~/.ccctl/config.toml.", p)
 }
 func MsgExited(code int, worktree, branch, cwd string) string {
 	if worktree == "" {
@@ -84,7 +114,21 @@ func CheckClaude(p string) error {
 	return nil
 }
 
-// FreshArgv builds the launch argv (§12). A prompt starting with "-" is preceded by "--".
+// CheckAgent verifies the executable for the selected agent. Both agents are
+// checked in the same way; only the message differs.
+func CheckAgent(agent Agent, claudePath, openCodePath string) error {
+	if agent == AgentOpenCode {
+		fi, err := os.Stat(openCodePath)
+		if err != nil || fi.IsDir() || fi.Mode()&0o111 == 0 {
+			return errors.New(MsgOpenCodeNotFound(openCodePath))
+		}
+		return nil
+	}
+	return CheckClaude(claudePath)
+}
+
+// FreshArgv builds the Claude launch argv (§12). A prompt starting with "-" is
+// preceded by "--".
 func FreshArgv(claude, sessionID, settings, prompt string) []string {
 	a := []string{claude, "--dangerously-skip-permissions", "--session-id", sessionID, "--settings", settings}
 	if prompt != "" {
@@ -96,9 +140,41 @@ func FreshArgv(claude, sessionID, settings, prompt string) []string {
 	return a
 }
 
-// ResumeArgv builds the resume argv (§5 resume story).
+// ResumeArgv builds the Claude resume argv (§5 resume story).
 func ResumeArgv(claude, sessionID, settings string) []string {
 	return []string{claude, "--resume", sessionID, "--dangerously-skip-permissions", "--settings", settings}
+}
+
+// OpenCodeFreshArgv builds a fresh OpenCode TUI argv. --session creates the
+// session when the ID does not exist yet, so ccctl owns the ID it persists.
+func OpenCodeFreshArgv(opencode, sessionID, prompt string) []string {
+	a := []string{opencode, "--session", sessionID, "--auto"}
+	if prompt != "" {
+		a = append(a, "--prompt", prompt)
+	}
+	return a
+}
+
+// OpenCodeResumeArgv continues an existing OpenCode session with auto-approved
+// permissions. No prompt is passed on resume.
+func OpenCodeResumeArgv(opencode, sessionID string) []string {
+	return []string{opencode, "--session", sessionID, "--auto"}
+}
+
+// AgentFreshArgv dispatches the fresh-launch argv by agent.
+func AgentFreshArgv(agent Agent, claude, opencode, sessionID, settings, prompt string) []string {
+	if agent == AgentOpenCode {
+		return OpenCodeFreshArgv(opencode, sessionID, prompt)
+	}
+	return FreshArgv(claude, sessionID, settings, prompt)
+}
+
+// AgentResumeArgv dispatches the resume argv by agent.
+func AgentResumeArgv(agent Agent, claude, opencode, sessionID, settings string) []string {
+	if agent == AgentOpenCode {
+		return OpenCodeResumeArgv(opencode, sessionID)
+	}
+	return ResumeArgv(claude, sessionID, settings)
 }
 
 // HookSettings renders the per-session settings file registering Notification

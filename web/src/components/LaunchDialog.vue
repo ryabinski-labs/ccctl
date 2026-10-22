@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, ApiError } from '../lib/api';
 import { filterRepos, repoListState, type ReposResponse } from '../lib/repoList';
-import { TEXT, type Inspection, type Repo, type Transcript } from '../lib/types';
+import { AGENT_LABEL, TEXT, type Agent, type Inspection, type Repo, type Transcript } from '../lib/types';
 import { useSessions } from '../stores/sessions';
 import AppIcon from './AppIcon.vue';
 import ModalShell from './ModalShell.vue';
@@ -13,6 +13,18 @@ const store = useSessions();
 
 const PROMPT_MAX = 10000;
 const LAST_KEY = 'ccctl.lastFolder';
+const LAST_AGENT_KEY = 'ccctl.lastAgent';
+
+function readAgent(): Agent {
+  try {
+    return localStorage.getItem(LAST_AGENT_KEY) === 'opencode' ? 'opencode' : 'claude';
+  } catch {
+    return 'claude';
+  }
+}
+
+const agent = ref<Agent>(readAgent());
+const AGENTS: Agent[] = ['claude', 'opencode'];
 
 const task = ref('');
 const taskTouched = ref(false);
@@ -85,7 +97,7 @@ const preview = computed(() => {
 
 const canSubmit = computed(() => {
   if (submitting.value) return false;
-  if (mode.value === 'resume') return resumable.value && !lookingUp.value;
+  if (mode.value === 'resume') return resumable.value && !lookingUp.value && agent.value !== 'opencode';
   return !!folderPath.value && !pathError.value && prompt.value.length <= PROMPT_MAX;
 });
 
@@ -153,6 +165,14 @@ watch(resumeInput, (v) => {
 watch(mode, (m) => {
   serverError.value = '';
   if (m === 'new' && !taskEdited.value && task.value === autoTask) task.value = '';
+});
+
+watch(agent, (a) => {
+  try {
+    localStorage.setItem(LAST_AGENT_KEY, a);
+  } catch {
+    /* per-viewer convenience only */
+  }
 });
 
 /** A pointer click on Resume by ID moves on to the ID field; arrow keys stay in the radio group. */
@@ -241,9 +261,10 @@ async function submit() {
     const resuming = mode.value === 'resume';
     const r = await api.launch(
       resuming
-        ? { task: normalizedTask.value, path: '', worktree: false, prompt: '', slot: props.slot, resume_id: transcript.value?.session_id ?? resumeInput.value.trim() }
+        ? { task: normalizedTask.value, agent: 'claude', path: '', worktree: false, prompt: '', slot: props.slot, resume_id: transcript.value?.session_id ?? resumeInput.value.trim() }
         : {
             task: normalizedTask.value,
+            agent: agent.value,
             path: folderPath.value,
             worktree: worktree.value && worktreeAllowed.value,
             prompt: prompt.value,
@@ -311,6 +332,15 @@ onMounted(async () => {
       </header>
 
       <div class="field">
+        <div class="seg" role="radiogroup" aria-label="Agent">
+          <label v-for="a in AGENTS" :key="a" class="seg-opt">
+            <input v-model="agent" type="radio" name="agent" :value="a" :data-testid="`agent-${a}`" />
+            <span>{{ AGENT_LABEL[a] }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
         <div class="seg" role="radiogroup" aria-label="Session type">
           <label class="seg-opt">
             <input v-model="mode" type="radio" name="mode" value="new" data-testid="mode-new" />
@@ -333,12 +363,14 @@ onMounted(async () => {
           name="resume_id"
           autocomplete="off"
           spellcheck="false"
+          :disabled="agent === 'opencode'"
           placeholder="18cf1881-5565-4e54-b0fd-ffafef9e86b1"
           :aria-invalid="!!lookupError"
           aria-describedby="launch-resume-status"
         />
         <div id="launch-resume-status" aria-live="polite">
-          <p v-if="lookupError" class="hint hint--err" data-testid="resume-error">{{ lookupError }}</p>
+          <p v-if="agent === 'opencode'" class="hint hint--err" data-testid="resume-agent-note">{{ TEXT.resumeOpenCodeOnly }}</p>
+          <p v-else-if="lookupError" class="hint hint--err" data-testid="resume-error">{{ lookupError }}</p>
           <p v-else-if="lookingUp" class="hint">Looking for that session on the host…</p>
           <div v-else-if="transcript" class="found" :class="{ 'found--warn': !resumable }" data-testid="resume-found">
             <p class="found-title">{{ transcript.title || 'Untitled session' }}</p>
@@ -362,8 +394,7 @@ onMounted(async () => {
           </div>
           <p v-else class="hint">
             Paste an ID or a whole <span class="mono">claude --resume …</span> command. The session resumes in the folder it ran in.
-          </p>
-        </div>
+          </p>        </div>
       </div>
 
       <div class="field">
@@ -493,7 +524,7 @@ onMounted(async () => {
           rows="4"
           :maxlength="PROMPT_MAX"
           aria-describedby="launch-prompt-count"
-          placeholder="What should Claude work on?"
+          :placeholder="TEXT.promptPlaceholder(agent)"
         />
         <p id="launch-prompt-count" class="hint count">
           {{ prompt.length.toLocaleString('en-US') }} / {{ PROMPT_MAX.toLocaleString('en-US') }}

@@ -1,0 +1,433 @@
+schema: tdd-artifact/v1
+feature: opencode-support
+title: OpenCode sessions alongside Claude Code
+source:
+  prd: docs/prd/opencode-support.md
+  prd_sha256: 13ae96b58b61257b483b3fdd61a03dd7993589607a07e2e3f09640388b66ad95
+defaults:
+  priority: P2
+non_goals:
+  - Manual Resume by ID for OpenCode; restart resume uses the stored session ID (DL-003).
+  - Agents other than Claude Code and OpenCode.
+  - Renaming ccctl, ~/.ccctl, service labels, or the GitHub repository (DL-007).
+  - Model, provider, or OpenCode agent selection in the launch form.
+  - Per-agent concurrency limits; all panes share six slots (DL-004).
+  - Driving OpenCode through its HTTP server, web UI, ACP server, or database.
+  - Reading, exporting, or migrating OpenCode session data.
+  - Controlling more than one host from one page.
+open_questions: []
+requirements:
+  - id: REQ-001
+    text: The owner can launch a fresh Claude Code or OpenCode session into a free slot with the chosen agent, the existing task, path, worktree, and prompt rules, the agent-specific argv, and the agent recorded in state.
+    priority: P0
+    type: functional
+    prd_ref: "§5 story 1; §7; DL-001, DL-005, DL-006"
+    scenarios:
+      - id: SC-001-a
+        level: acceptance
+        title: Launch form starts an OpenCode session in a new worktree
+        given: the controller runs with a fake OpenCode binary, the owner's Tailscale login, a git repo folio under the scanned root, and 6 free slots
+        when: the owner submits the launch form with agent OpenCode, task fix-login, repo folio, worktree on, and first prompt hello world
+        then: slot 1 shows the fake OpenCode TUI in folio-wt-fix-login, started with a session ID, --auto, and the prompt, and state.json records agent opencode
+        oracle: within 5000 ms pane 1 text contains 'FAKE_OPENCODE cwd=ROOT/folio-wt-fix-login', '--session UUID', '--auto' and 'prompt=hello world'; state.json slots[0].agent == 'opencode' and slots[0].session_id matches the UUID
+        doubles: fake OpenCode binary on opencode_path; fake Tailscale status and WhoIs; real PTYs and git
+        data:
+          task: fix-login
+          repo: folio
+          prompt: hello world
+        test_ref: "web/e2e/opencode.tdd.spec.ts::SC-001-a"
+        status: "green"
+        tags: [core, launch]
+      - id: SC-001-b
+        level: unit
+        title: OpenCode fresh-launch argv
+        given: opencode_path /opt/opencode, session ID U, and first prompt hello world
+        when: the OpenCode launch argv is built with and without a prompt
+        then: the argv carries --session, --auto, and the prompt only when given
+        oracle: "argv == ['/opt/opencode', '--session', 'U', '--auto', '--prompt', 'hello world'] with a prompt, and the same slice without the last two elements without one"
+        doubles: none; pure function
+        test_ref: "internal/tdd/opencode_test.go::TestSc001BOpenCodeFreshArgv"
+        status: "green"
+        tags: [unit, argv]
+      - id: SC-001-c
+        level: unit
+        title: Claude fresh-launch argv is unchanged
+        given: claude_path /h/.local/bin/claude, session UUID U, settings file F, and prompt hello
+        when: the Claude launch argv is built with and without a prompt
+        then: the argv keeps the bypass flag, session id, settings file, and prompt behavior
+        oracle: "argv == ['/h/.local/bin/claude', '--dangerously-skip-permissions', '--session-id', 'U', '--settings', 'F', 'hello'] with a prompt, and the same slice minus the last element without one"
+        doubles: none; pure function
+        test_ref: "internal/tdd/opencode_test.go::TestSc001CClaudeFreshArgvUnchanged"
+        status: "green"
+        tags: [unit, argv, regression]
+      - id: SC-001-d
+        level: integration
+        title: Unknown agent is refused before any process starts
+        given: the controller runs with 6 free slots
+        when: a launch request names agent gemini
+        then: the request is refused with the agent validation message and no process or slot is created
+        oracle: "HTTP 400 body.error == 'Agent must be claude or opencode.'; invocation count == 0; slot 1 == null"
+        doubles: fake agent binaries; real controller and PTY plumbing
+        negative: true
+        test_ref: "internal/tdd/opencode_test.go::TestSc001DUnknownAgentRefused"
+        status: "green"
+        tags: [errors, validation]
+      - id: SC-001-e
+        level: integration
+        title: Missing OpenCode binary is reported
+        given: opencode_path points to /nonexistent/opencode and 6 slots are free
+        when: the owner launches an OpenCode session
+        then: the launch is refused with the named-path message and no session starts
+        oracle: "HTTP 400 body.error == 'OpenCode was not found at /nonexistent/opencode. Set opencode_path in ~/.ccctl/config.toml.'; slot 1 == null"
+        doubles: fake controller with an intentionally missing opencode_path; real HTTP API
+        negative: true
+        test_ref: "internal/tdd/opencode_test.go::TestSc001EMissingOpenCodeBinary"
+        status: "green"
+        tags: [errors, launch]
+  - id: REQ-002
+    text: Claude Code and OpenCode sessions share the six slots, each slot runs the agent chosen for it, and the seventh active slot is refused.
+    priority: P0
+    type: functional
+    prd_ref: "§5 stories 1 and 3; §7; §13; DL-004"
+    scenarios:
+      - id: SC-002-a
+        level: acceptance
+        title: Claude and OpenCode run side by side in the grid
+        given: the owner has 6 free slots and the repository list contains folio
+        when: they start Claude Code in slot 1 and OpenCode in slot 2 through the launch form
+        then: both panes show their own live agent and the two agents are labelled correctly
+        oracle: pane 1 contains 'FAKE_CLAUDE' and 'Claude Code'; pane 2 contains 'FAKE_OPENCODE' and 'OpenCode'; state.json slots 1 and 2 have agent claude and opencode
+        doubles: fake Claude and OpenCode binaries; real PTYs; fake Tailscale
+        test_ref: "web/e2e/opencode.tdd.spec.ts::SC-002-a"
+        status: "green"
+        tags: [core, grid]
+      - id: SC-002-b
+        level: integration
+        title: A seventh mixed launch is refused
+        given: 6 active sessions split evenly between Claude Code and OpenCode
+        when: the owner requests a seventh session of either agent
+        then: the request is refused with the all-slots message and no seventh process starts
+        oracle: "HTTP 409 body.error == 'All 6 slots are in use. Stop or close a session first.'; invocation count == 6"
+        doubles: fake agent binaries; real manager and state
+        negative: true
+        test_ref: "internal/tdd/opencode_test.go::TestSc002BSeventhMixedLaunchRefused"
+        status: "green"
+        tags: [errors, slots]
+      - id: SC-002-c
+        level: integration
+        title: Each mixed slot receives its own agent argv
+        given: 3 Claude Code and 3 OpenCode sessions launched in slots 1 through 6
+        when: the controller starts all six processes
+        then: each invocation uses the argv for its slot's agent and records that agent
+        oracle: slots 1, 3, 5 contain '--dangerously-skip-permissions' and agent claude; slots 2, 4, 6 contain '--session' and '--auto' and agent opencode
+        doubles: fake agent binaries that log argv; real PTYs
+        test_ref: "internal/tdd/opencode_test.go::TestSc002CMixedSlotArgv"
+        status: "green"
+        tags: [slots, argv]
+  - id: REQ-003
+    text: An OpenCode pane flips to needs-input when the installed plugin reports permission.asked or session.idle, clears on input, and ignores events for another session.
+    priority: P0
+    type: functional
+    prd_ref: "§5 story 2; §9; §13; DL-002"
+    scenarios:
+      - id: SC-003-a
+        level: acceptance
+        title: OpenCode permission event turns the pane amber
+        given: a running OpenCode session in slot 1 with the ccctl plugin installed
+        when: OpenCode reports permission.asked for that session
+        then: the pane shows Needs input within 2 seconds and the tab title counts it
+        oracle: within 2000 ms the slot-1 header contains 'Needs input' and document.title starts with '(1)'; the needs_input log has agent opencode and source opencode-plugin
+        doubles: fake OpenCode binary; test helper posts the plugin event to the controller socket; fake Tailscale
+        test_ref: "web/e2e/opencode.tdd.spec.ts::SC-003-a"
+        status: "green"
+        tags: [needs-input, core]
+      - id: SC-003-b
+        level: integration
+        title: Plugin posts both OpenCode events and no-ops outside ccctl
+        given: the ccctl OpenCode plugin source and a fake Unix socket server
+        when: the plugin receives permission.asked and session.idle with CCCTL_SLOT set, then receives an event with CCCTL_SLOT unset
+        then: both set-slot events post slot, hook, and session_id; the unset event posts nothing
+        oracle: "socket received exactly 2 POSTs with body {'slot':1,'hook':'permission.asked','session_id':'ses_x'} and {'slot':1,'hook':'session.idle','session_id':'ses_x'}; POST count after the unset event is still 2"
+        doubles: real Node runtime; fake Unix-socket HTTP server; no real OpenCode process
+        data:
+          slot: 1
+          session_id: ses_x
+        test_ref: "web/src/tdd/opencode_plugin.tdd.spec.ts::SC-003-b"
+        status: "green"
+        tags: [plugin, integration]
+      - id: SC-003-c
+        level: integration
+        title: A plugin event for another session is ignored
+        given: a running OpenCode session with session ID A in slot 1
+        when: the plugin posts permission.asked with session ID B
+        then: slot 1 stays running and no needs_input event is logged for it
+        oracle: slot 1 state == 'running'; len(log.Events('needs_input')) == 0
+        doubles: fake OpenCode binary; direct hook-socket post; real manager
+        negative: true
+        test_ref: "internal/tdd/opencode_test.go::TestSc003CEventForAnotherSessionIgnored"
+        status: "green"
+        tags: [needs-input, negative]
+      - id: SC-003-d
+        level: integration
+        title: Typing clears an OpenCode needs-input state
+        given: an OpenCode session in slot 2 that is in needs-input
+        when: the owner sends the keystroke y through the WebSocket
+        then: the pane returns to running and the input reaches the OpenCode PTY
+        oracle: slot 2 state == 'running' within 2000 ms; fake OpenCode input log contains 'y'
+        doubles: fake OpenCode binary; real WebSocket and PTY
+        test_ref: "internal/tdd/opencode_test.go::TestSc003DTypingClearsOpenCodeNeedsInput"
+        status: "green"
+        tags: [needs-input, input]
+  - id: REQ-004
+    text: Every pane shows its agent's name in the header and in its accessible name, and a session saved without an agent is labelled Claude Code.
+    priority: P0
+    type: functional
+    prd_ref: "§5 story 3; §6"
+    scenarios:
+      - id: SC-004-a
+        level: acceptance
+        title: Pane headers name each agent
+        given: one Claude Code session and one OpenCode session are open
+        when: the page renders the grid
+        then: each pane header shows the right agent name and the pane accessible name includes it
+        oracle: "[data-slot='1'] [data-testid='pane-header'] contains 'Claude Code'; [data-slot='2'] [data-testid='pane-header'] contains 'OpenCode'; both panes' aria-label contains the same agent name"
+        doubles: fake agent binaries; real page and PTYs
+        test_ref: "web/e2e/opencode.tdd.spec.ts::SC-004-a"
+        status: "green"
+        tags: [ui, labels]
+  - id: REQ-005
+    text: Active sessions of either agent resume in their original slots and folders after a controller restart, and a failed resume can start fresh with the same agent.
+    priority: P0
+    type: functional
+    prd_ref: "§5 story 4; §10; DL-003"
+    scenarios:
+      - id: SC-005-a
+        level: integration
+        title: Mixed active sessions resume before the listener binds
+        given: a version 2 state file with 2 Claude and 2 OpenCode active slots plus 1 exited slot
+        when: the controller starts
+        then: the 4 active sessions are relaunched in their slots with their recorded agents and the exited one is not
+        oracle: invocation count == 4 before Addr() binds; Claude invocations contain '--resume ID --dangerously-skip-permissions --settings'; OpenCode invocations contain '--session ID --auto' with no '--prompt'; slot 5 has no invocation
+        doubles: version 2 state file; fake agent binaries; fake Tailscale; real manager
+        data:
+          slots: 5
+          claude_slots: 2
+          opencode_slots: 2
+          exited_slot: 5
+        test_ref: "internal/tdd/opencode_test.go::TestSc005AMixedSessionsResume"
+        status: "green"
+        tags: [resume, core]
+      - id: SC-005-b
+        level: integration
+        title: Failed OpenCode resume is reported
+        given: a saved OpenCode session whose fake process exits with code 1 within 500 ms
+        when: the controller restarts
+        then: the pane shows the resume-failed message and logs the failure with agent opencode
+        oracle: "slot state == 'resume-failed'; message == 'Could not resume TASK (exit code 1).'; log event resume_failed has agent == 'opencode'"
+        doubles: fake OpenCode binary in resume-fail mode; fake Tailscale; real manager
+        test_ref: "internal/tdd/opencode_test.go::TestSc005BFailedOpenCodeResume"
+        status: "green"
+        tags: [resume, errors]
+      - id: SC-005-c
+        level: integration
+        title: Start fresh keeps the OpenCode agent
+        given: a resume-failed OpenCode pane for task TASK
+        when: the owner presses Start fresh
+        then: a new OpenCode process starts in the same slot, folder, worktree, and branch with a new session ID
+        oracle: invocation argv contains '--session NEW_ID' and '--auto'; NEW_ID != old ID; state slot agent == 'opencode'; slot cwd, worktree, and branch unchanged
+        doubles: fake OpenCode binary; real manager
+        test_ref: "internal/tdd/opencode_test.go::TestSc005CStartFreshKeepsOpenCode"
+        status: "green"
+        tags: [resume, fresh]
+  - id: REQ-006
+    text: ccctl install records opencode_path when present, writes the marked plugin to the OpenCode config directory, keeps Claude-only installs working, warns on conflict, and uninstall removes only ccctl's plugin.
+    priority: P1
+    type: functional
+    prd_ref: "§5 story 5; §12; DL-006, DL-010"
+    scenarios:
+      - id: SC-006-a
+        level: unit
+        title: Found OpenCode path is recorded
+        given: a config file with an unrelated key and lookPath returning /opt/homebrew/bin/opencode for opencode
+        when: the install path recorder runs
+        then: opencode_path is the absolute path, the unrelated key survives, and the file mode stays 0600
+        oracle: "toml opencode_path == '/opt/homebrew/bin/opencode'; unrelated key unchanged; mode == 0600"
+        doubles: temp config file; stub lookPath
+        test_ref: "internal/tdd/opencode_install_test.go::TestSc006ARecordsOpenCodePath"
+        status: "green"
+        tags: [install, config]
+      - id: SC-006-b
+        level: unit
+        title: Missing OpenCode does not fail install
+        given: a temp config file and lookPath returning not-found for opencode
+        when: the install path recorder runs
+        then: it returns no error and writes no opencode_path
+        oracle: "error == nil; config has no opencode_path; unrelated keys unchanged"
+        doubles: temp config file; stub lookPath
+        negative: true
+        test_ref: "internal/tdd/opencode_install_test.go::TestSc006BMissingOpenCodeIsOptional"
+        status: "green"
+        tags: [install, optional]
+      - id: SC-006-c
+        level: unit
+        title: Plugin is written under the configured OpenCode config directory
+        given: OPENCODE_CONFIG_DIR points at a temp folder with no plugins folder
+        when: the plugin installer runs
+        then: plugins/ccctl.js exists with ccctl's marker and both event handlers, and the returned path is that file
+        oracle: "path == CONFIG/plugins/ccctl.js; content contains 'permission.asked', 'session.idle', 'CCCTL_SOCK', 'CCCTL_SLOT' and 'ccctl'; mode&0o444 != 0"
+        doubles: temp config directory
+        test_ref: "internal/tdd/opencode_install_test.go::TestSc006CPluginWritten"
+        status: "green"
+        tags: [install, plugin]
+      - id: SC-006-d
+        level: unit
+        title: A foreign plugin file is not overwritten
+        given: plugins/ccctl.js exists with content 'user-owned'
+        when: the plugin installer runs
+        then: it returns a conflict and leaves the file unchanged
+        oracle: "errors.Is(err, install.ErrPluginConflict); file content == 'user-owned'; log event opencode_plugin_conflict is emitted by the install command"
+        doubles: temp config directory
+        negative: true
+        test_ref: "internal/tdd/opencode_install_test.go::TestSc006DForeignPluginKept"
+        status: "green"
+        tags: [install, conflict]
+      - id: SC-006-e
+        level: unit
+        title: Uninstall removes only the marked plugin
+        given: two temp config directories, one with a marked ccctl plugin and one with a user-owned file at the same path
+        when: the plugin remover runs on each
+        then: the marked file is removed and the user-owned file is kept
+        oracle: "marked path does not exist; unmarked path still contains 'user-owned'; no error for either"
+        doubles: temp config directories
+        test_ref: "internal/tdd/opencode_install_test.go::TestSc006ERemoveOnlyMarkedPlugin"
+        status: "green"
+        tags: [install, uninstall]
+  - id: REQ-007
+    text: The launch form lets the owner choose the agent, remembers the last choice per browser, and shows the Claude-only Resume by ID limit when OpenCode is selected.
+    priority: P1
+    type: functional
+    prd_ref: "§5 story 6; §6; DL-008"
+    scenarios:
+      - id: SC-007-a
+        level: acceptance
+        title: OpenCode selection explains the Resume by ID limit
+        given: the launch form is open
+        when: the owner selects agent OpenCode and switches to Resume by ID
+        then: the note appears and submit is disabled; selecting Claude Code restores the lookup
+        oracle: "Resume tab shows 'Resume by ID is Claude Code only in this release.'; launch-submit is disabled; after selecting Claude Code the note is gone and the launch-submit state follows the existing lookup rules"
+        doubles: static frontend against the e2e controller
+        test_ref: "web/e2e/opencode.tdd.spec.ts::SC-007-a"
+        status: "green"
+        tags: [ui, resume]
+      - id: SC-007-b
+        level: acceptance
+        title: Last chosen agent is remembered
+        given: a browser that has not chosen an agent before
+        when: the owner opens the form, selects OpenCode, closes and reopens the form, then opens a fresh browser profile
+        then: the first form starts on Claude Code, the reopened form starts on OpenCode, and the fresh profile starts on Claude Code again
+        oracle: "first launch-form agent == 'Claude Code'; reopened form agent == 'OpenCode'; fresh-profile form agent == 'Claude Code'"
+        doubles: real browser localStorage; static frontend
+        test_ref: "web/e2e/opencode.tdd.spec.ts::SC-007-b"
+        status: "green"
+        tags: [ui, memory]
+  - id: REQ-008
+    text: An OpenCode launch reaches running within 5 seconds at p95 and a plugin event flips needs-input within 2 seconds at p95, measured on the host.
+    priority: P1
+    type: non-functional
+    prd_ref: "§13 launch latency and needs-input latency"
+    scenarios:
+      - id: SC-008-a
+        level: integration
+        title: OpenCode launch meets the 5 second bar
+        given: 6 free slots and a fake OpenCode binary
+        when: the owner launches 5 OpenCode sessions in sequence
+        then: each reaches running within 5 seconds and the p95 is at most 5000 ms
+        oracle: "for 5 launches, max(POST->running ms) <= 5000; p95 <= 5000"
+        doubles: fake OpenCode binary; real controller, PTY, and WebSocket
+        tags: [nfr, latency]
+        test_ref: "internal/tdd/opencode_test.go::TestSc008AOpenCodeLaunchLatency"
+        status: "green"
+      - id: SC-008-b
+        level: integration
+        title: Needs-input signal meets the 2 second bar
+        given: a running OpenCode session with the plugin path connected
+        when: the plugin posts 5 permission.asked events with a small gap
+        then: each produces a needs-input state within 2 seconds and the p95 is at most 2000 ms
+        oracle: "for 5 events, max(post->needs-input ms) <= 2000; p95 <= 2000"
+        doubles: fake OpenCode binary; direct hook posts; real WebSocket
+        tags: [nfr, needs-input]
+        test_ref: "internal/tdd/opencode_test.go::TestSc008BNeedsInputLatency"
+        status: "green"
+  - id: REQ-009
+    text: README and the wire protocol document both agents, the agent API field, opencode_path, the OpenCode version floor, and the Resume by ID limit.
+    priority: P2
+    type: functional
+    prd_ref: "§5 story 7; §6"
+    scenarios:
+      - id: SC-009-a
+        level: unit
+        title: Docs cover both agents and their limits
+        given: the repository at the release commit
+        when: the documentation check reads README.md and docs/design/protocol.md
+        then: both files name OpenCode and each required setup or limit string is present
+        oracle: "README contains 'OpenCode', 'opencode_path', '2.1.3' and 'Resume by ID is Claude Code only'; protocol.md contains 'agent' and 'opencode'"
+        doubles: real documentation files
+        test_ref: "internal/tdd/opencode_docs_test.go::TestSc009ADocsCoverBothAgents"
+        status: "green"
+        tags: [docs]
+  - id: REQ-010
+    text: A launch request without an agent starts Claude Code, a version 1 state file loads with agent claude, and saved state is version 2 with agent on every slot.
+    priority: P0
+    type: constraint
+    prd_ref: "§5 story 1; §10; §12; §13"
+    scenarios:
+      - id: SC-010-a
+        level: integration
+        title: Missing launch agent defaults to Claude
+        given: a JSON launch request with no agent field
+        when: the controller accepts it
+        then: the session runs Claude Code and state records agent claude
+        oracle: "invocation contains '--dangerously-skip-permissions'; state.json version == 2 and slots[0].agent == 'claude'"
+        doubles: fake Claude binary; real controller and PTY
+        test_ref: "internal/tdd/opencode_test.go::TestSc010AMissingAgentDefaultsToClaude"
+        status: "green"
+        tags: [compat, default]
+      - id: SC-010-b
+        level: unit
+        title: Version 1 state loads as Claude and saves as version 2
+        given: a version 1 state file with one slot and no agent field
+        when: the store loads it and saves it again with agent opencode on the slot
+        then: the loaded slot reports agent claude and the saved file is version 2 with agent opencode
+        oracle: "Load().Slots[0].Agent == 'claude'; Save then read JSON has version == 2 and slots[0].agent == 'opencode'"
+        doubles: temp state file
+        test_ref: "internal/tdd/opencode_test.go::TestSc010BStateV1LoadsAndV2Saves"
+        status: "green"
+        tags: [compat, state]
+      - id: SC-010-c
+        level: contract
+        title: State and hello expose the agent field
+        given: one Claude and one OpenCode session are active
+        when: a client reads GET /api/state and opens the WebSocket hello
+        then: every slot object carries an agent value and existing fields keep their names
+        oracle: "GET /api/state.slots[0].agent == 'claude' and slots[1].agent == 'opencode'; WS hello slots have the same agent values; slot objects still have slot, task, cwd, repo, worktree, branch, session_id, state, launched_at, resumed, exit_code, message"
+        doubles: fake agent binaries; real HTTP and WebSocket
+        test_ref: "internal/tdd/opencode_test.go::TestSc010CStateContractIncludesAgent"
+        status: "green"
+        tags: [contract, api]
+  - id: REQ-011
+    text: Session lifecycle logs identify the agent, and needs-input logs identify whether the event came from a Claude hook or the OpenCode plugin.
+    priority: P1
+    type: functional
+    prd_ref: "§9; §3"
+    scenarios:
+      - id: SC-011-a
+        level: integration
+        title: Logs carry agent and needs-input source
+        given: one Claude and one OpenCode session start, the OpenCode session receives a plugin event, and both sessions exit
+        when: the owner reads the controller log
+        then: the lifecycle events carry the agent and the needs-input event carries its source
+        oracle: "session_started events have agent claude and opencode; needs_input has agent opencode and source opencode-plugin; session_exited events have the matching agent; no credential value appears in the log"
+        doubles: fake agent binaries; fake Tailscale; real log buffer
+        test_ref: "internal/tdd/opencode_test.go::TestSc011ALogsCarryAgent"
+        status: "green"
+        tags: [instrumentation, logs]

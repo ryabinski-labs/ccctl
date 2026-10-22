@@ -13,11 +13,12 @@ import (
 )
 
 // Version is the state file format this build reads and writes.
-const Version = 1
+const Version = 2
 
 type Slot struct {
 	Slot       int       `json:"slot"`
 	Task       string    `json:"task"`
+	Agent      string    `json:"agent"`
 	Cwd        string    `json:"cwd"`
 	Repo       string    `json:"repo"`
 	Worktree   string    `json:"worktree"`
@@ -57,6 +58,12 @@ func (s *Store) Load() (File, error) {
 	}
 	if f.Version > Version {
 		return f, fmt.Errorf("State file version %d is newer than this ccctl supports.", f.Version)
+	}
+	// Version 1 files have no agent: every session was Claude Code.
+	for i := range f.Slots {
+		if f.Slots[i].Agent == "" {
+			f.Slots[i].Agent = "claude"
+		}
 	}
 	return f, nil
 }

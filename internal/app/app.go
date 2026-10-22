@@ -85,7 +85,9 @@ func New(o Options) (*App, error) {
 	a.mon.Interval = o.Interval
 	a.S = &server.Server{Home: o.Home, Host: a.hostName, Static: o.Static, Log: o.Log, Version: o.Version, ScanTimeout: o.ScanTimeout}
 	a.M = session.NewManager(session.Options{
-		Home: o.Home, ClaudePath: o.Config.ClaudePath, CCCTLPath: o.CCCTLPath, SettingsDir: filepath.Join(dir, "sessions"),
+		Home: o.Home, ClaudePath: o.Config.ClaudePath, OpenCodePath: o.Config.OpenCodePath,
+		OpenCodeConfigDir: o.Config.OpenCodeConfigDir,
+		CCCTLPath:         o.CCCTLPath, SettingsDir: filepath.Join(dir, "sessions"),
 		SockPath: o.SockPath, Env: o.Env, Store: a.Store, Log: o.Log, StopGrace: o.StopGrace, ResumeGrace: o.ResumeGrace,
 		OnChange: a.S.SlotChanged,
 		SessionEnv: func() map[string]string {
@@ -319,7 +321,7 @@ func (a *App) serveSock() (net.Listener, error) {
 			http.Error(w, "bad hook", 400)
 			return
 		}
-		_ = a.M.Hook(ev.Slot, ev.Hook, ev.SessionID)
+		_ = a.M.HookSource(ev.Slot, ev.Hook, ev.SessionID, ev.Source)
 		w.WriteHeader(204)
 	})
 	mux.HandleFunc("GET /status", func(w http.ResponseWriter, r *http.Request) {

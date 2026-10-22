@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/ryabinski-labs/ccctl/internal/opencode"
 )
 
 const (
@@ -125,7 +127,7 @@ func RenderLaunchdPlist(binPath string, env map[string]string, logDir string) ([
 // RenderSystemdUnit renders the Linux user unit that runs "binPath serve".
 func RenderSystemdUnit(binPath string, env map[string]string) string {
 	var b strings.Builder
-	b.WriteString("[Unit]\nDescription=ccctl, a web controller for Claude Code sessions\nAfter=network-online.target\n\n[Service]\n")
+	b.WriteString("[Unit]\nDescription=ccctl, a web controller for Claude Code and OpenCode sessions\nAfter=network-online.target\n\n[Service]\n")
 	b.WriteString("ExecStart=" + binPath + " serve\n")
 	b.WriteString("Restart=always\nRestartSec=2\n")
 	for _, k := range sortedKeys(env) {
@@ -158,6 +160,38 @@ func RecordClaudePath(configPath string, lookPath func(string) (string, error)) 
 		}
 	}
 	return setConfigKey(configPath, "claude_path", p)
+}
+
+// RecordOpenCodePath writes opencode_path when OpenCode is on PATH. Unlike
+// Claude Code, OpenCode is optional: a missing binary is not an install error,
+// and the returned path is empty.
+func RecordOpenCodePath(configPath string, lookPath func(string) (string, error)) (string, error) {
+	p, err := lookPath("opencode")
+	if err != nil {
+		return "", nil
+	}
+	if !filepath.IsAbs(p) {
+		if p, err = filepath.Abs(p); err != nil {
+			return "", err
+		}
+	}
+	if err := setConfigKey(configPath, "opencode_path", p); err != nil {
+		return "", err
+	}
+	return p, nil
+}
+
+// openCodeConfigDir resolves the directory whose plugins folder holds ccctl.js:
+// OPENCODE_CONFIG_DIR wins, then the recorded opencode_config_dir, then the
+// default. A missing or unreadable config falls back to the default.
+func openCodeConfigDir(o *Options) string {
+	var cfg struct {
+		Dir string `toml:"opencode_config_dir"`
+	}
+	if _, err := toml.DecodeFile(ConfigPath(o.Home), &cfg); err != nil {
+		cfg.Dir = ""
+	}
+	return opencode.ResolveConfigDir(o.Home, cfg.Dir, o.Env)
 }
 
 func setConfigKey(configPath, key string, value any) error {
@@ -316,6 +350,30 @@ func Run(ctx context.Context, o Options) error {
 	if err := RecordClaudePath(ConfigPath(o.Home), o.LookPath); err != nil {
 		return err
 	}
+	if dir := o.Env("OPENCODE_CONFIG_DIR"); dir != "" {
+		if err := setConfigKey(ConfigPath(o.Home), "opencode_config_dir", dir); err != nil {
+			return err
+		}
+	}
+	opencodePath, err := RecordOpenCodePath(ConfigPath(o.Home), o.LookPath)
+	if err != nil {
+		return err
+	}
+	if opencodePath != "" {
+		path, err := opencode.WritePlugin(openCodeConfigDir(&o))
+		if err != nil {
+			if errors.Is(err, opencode.ErrPluginConflict) {
+				fmt.Fprintf(o.Out, "Warning: opencode_plugin_conflict: %v\n", err)
+				fmt.Fprintln(o.Out, "OpenCode panes will launch without the Needs input signal until that file is moved.")
+			} else {
+				fmt.Fprintf(o.Out, "Warning: opencode_plugin_written failed: %v\n", err)
+				fmt.Fprintln(o.Out, "OpenCode panes will launch without the Needs input signal.")
+			}
+		} else {
+			fmt.Fprintf(o.Out, "opencode_plugin_written: %s\n", path)
+			fmt.Fprintln(o.Out, "If OpenCode is already running, restart its background server once: opencode service restart")
+		}
+	}
 	env := map[string]string{"PATH": o.Env("PATH"), "HOME": o.Home}
 	switch o.GOOS {
 	case "darwin":
@@ -376,6 +434,10 @@ func Uninstall(ctx context.Context, o Options) error {
 	if err := o.defaults(); err != nil {
 		return err
 	}
+	if err := opencode.RemovePlugin(openCodeConfigDir(&o)); err != nil {
+		return err
+	}
+	fmt.Fprintln(o.Out, "opencode_plugin_removed: ccctl's OpenCode plugin was removed when present.")
 	switch o.GOOS {
 	case "darwin":
 		_, _ = o.Run(ctx, "launchctl", "bootout", fmt.Sprintf("gui/%d/%s", o.UID, Label))

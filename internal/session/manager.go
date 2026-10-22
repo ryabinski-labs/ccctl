@@ -27,6 +27,7 @@ import (
 type Info struct {
 	Slot       int       `json:"slot"`
 	Task       string    `json:"task"`
+	Agent      Agent     `json:"agent"`
 	Cwd        string    `json:"cwd"`
 	Repo       string    `json:"repo"`
 	Worktree   string    `json:"worktree"`
@@ -54,16 +55,20 @@ func (e ValidationError) Error() string { return e.Msg }
 func invalid(err error) error { return ValidationError{err.Error()} }
 
 type Options struct {
-	Home        string // expands ~ in launch paths
-	ClaudePath  string
-	CCCTLPath   string
-	SettingsDir string
-	SockPath    string
-	Env         []string
-	Store       *state.Store
-	Log         *slog.Logger
-	StopGrace   time.Duration
-	ResumeGrace time.Duration
+	Home         string // expands ~ in launch paths
+	ClaudePath   string
+	OpenCodePath string
+	// OpenCodeConfigDir, when set, is exported to OpenCode sessions so they load
+	// the ccctl plugin from the same directory install wrote.
+	OpenCodeConfigDir string
+	CCCTLPath         string
+	SettingsDir       string
+	SockPath          string
+	Env               []string
+	Store             *state.Store
+	Log               *slog.Logger
+	StopGrace         time.Duration
+	ResumeGrace       time.Duration
 	// OnChange is called (without locks held) whenever a slot's info changes; nil info = slot cleared.
 	OnChange func(slot int, info *Info)
 	// SessionEnv returns extra variables for each new session (config [env]); may be nil.
@@ -96,6 +101,9 @@ func NewManager(o Options) *Manager {
 // SetClaudePath updates the configured claude binary.
 func (m *Manager) SetClaudePath(p string) { m.mu.Lock(); m.opt.ClaudePath = p; m.mu.Unlock() }
 
+// SetOpenCodePath updates the configured opencode binary.
+func (m *Manager) SetOpenCodePath(p string) { m.mu.Lock(); m.opt.OpenCodePath = p; m.mu.Unlock() }
+
 // Session is one claude process in a PTY.
 type Session struct {
 	m         *Manager
@@ -112,7 +120,7 @@ type Session struct {
 	sizes     map[string][2]uint16
 	curSize   [2]uint16
 	writeMu   sync.Mutex
-	ptyClosed bool // set under mu once ptmx is closed
+	ptyClosed bool   // set under mu once ptmx is closed
 	tail      []byte // last raw output bytes, for prompts split across reads
 }
 
@@ -154,6 +162,7 @@ func (m *Manager) session(slot int) (*Session, error) {
 // LaunchRequest is POST /api/sessions.
 type LaunchRequest struct {
 	Task     string `json:"task"`
+	Agent    string `json:"agent"`
 	Path     string `json:"path"`
 	Worktree bool   `json:"worktree"`
 	Prompt   string `json:"prompt"`
@@ -193,7 +202,14 @@ func (m *Manager) Launch(req LaunchRequest) (Info, error) {
 	if err != nil {
 		return Info{}, invalid(err)
 	}
+	agent, err := NormalizeAgent(req.Agent)
+	if err != nil {
+		return Info{}, invalid(err)
+	}
 	if strings.TrimSpace(req.ResumeID) != "" {
+		if agent == AgentOpenCode {
+			return Info{}, ValidationError{MsgOpenCodeResume}
+		}
 		return m.resumeByIDLocked(slot, task, req)
 	}
 	dir, err := ValidatePath(config.Expand(m.opt.Home, strings.TrimSpace(req.Path)))
@@ -203,10 +219,10 @@ func (m *Manager) Launch(req LaunchRequest) (Info, error) {
 	if err := ValidatePrompt(req.Prompt); err != nil {
 		return Info{}, invalid(err)
 	}
-	if err := CheckClaude(m.opt.ClaudePath); err != nil {
+	if err := CheckAgent(agent, m.opt.ClaudePath, m.opt.OpenCodePath); err != nil {
 		return Info{}, invalid(err)
 	}
-	info := Info{Slot: slot, Task: task, Cwd: dir, Repo: filepath.Base(dir)}
+	info := Info{Slot: slot, Task: task, Agent: agent, Cwd: dir, Repo: filepath.Base(dir)}
 	if req.Worktree && IsGitRepo(dir) {
 		plan, err := PlanWorktree(dir, task)
 		if err != nil {
@@ -249,28 +265,35 @@ func (m *Manager) resumeByIDLocked(slot int, task string, req LaunchRequest) (In
 	if err := CheckClaude(m.opt.ClaudePath); err != nil {
 		return Info{}, invalid(err)
 	}
-	return m.startLocked(Info{Slot: slot, Task: task, Cwd: dir, Repo: filepath.Base(dir), SessionID: id}, "", true)
+	return m.startLocked(Info{Slot: slot, Task: task, Agent: AgentClaude, Cwd: dir, Repo: filepath.Base(dir), SessionID: id}, "", true)
 }
 
-// startLocked spawns claude for info in info.Slot, replacing whatever was there. m.mu held.
+// startLocked spawns the selected agent for info in info.Slot, replacing whatever was there. m.mu held.
 func (m *Manager) startLocked(info Info, prompt string, resume bool) (Info, error) {
 	if !resume {
 		info.SessionID = uuid.NewString()
 	}
+	if !info.Agent.Valid() {
+		info.Agent = AgentClaude
+	}
 	info.State, info.Resumed, info.LaunchedAt, info.ExitCode, info.Message = Starting, resume, time.Now().UTC(), nil, ""
-	settings, err := m.writeSettings(info.Slot, info.SessionID)
-	if err != nil {
-		return Info{}, err
+	settings := ""
+	var err error
+	if info.Agent == AgentClaude {
+		settings, err = m.writeSettings(info.Slot, info.SessionID)
+		if err != nil {
+			return Info{}, err
+		}
 	}
 	var argv []string
 	if resume {
-		argv = ResumeArgv(m.opt.ClaudePath, info.SessionID, settings)
+		argv = AgentResumeArgv(info.Agent, m.opt.ClaudePath, m.opt.OpenCodePath, info.SessionID, settings)
 	} else {
-		argv = FreshArgv(m.opt.ClaudePath, info.SessionID, settings, prompt)
+		argv = AgentFreshArgv(info.Agent, m.opt.ClaudePath, m.opt.OpenCodePath, info.SessionID, settings, prompt)
 	}
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = info.Cwd
-	cmd.Env = m.env(info.Slot)
+	cmd.Env = m.env(info.Slot, info.Agent)
 	s := &Session{m: m, info: info, cmd: cmd, ring: NewRing(RingSize), subs: map[*Sub]struct{}{},
 		done: make(chan struct{}), sizes: map[string][2]uint16{}, curSize: [2]uint16{40, 120}, started: time.Now()}
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 40, Cols: 120})
@@ -313,11 +336,15 @@ var inheritedMarkers = map[string]bool{
 	"CLAUDE_CODE_STOP_HOOK_BLOCK_CAP": true, "CLAUDE_CODE_SSE_PORT": true,
 }
 
-func (m *Manager) env(slot int) []string {
+func (m *Manager) env(slot int, agent Agent) []string {
 	var env []string
 	for _, e := range m.opt.Env {
-		if k, _, _ := strings.Cut(e, "="); inheritedMarkers[k] || k == "TERM" || strings.HasPrefix(k, "CCCTL_") {
+		k, _, _ := strings.Cut(e, "=")
+		if inheritedMarkers[k] || k == "TERM" || strings.HasPrefix(k, "CCCTL_") {
 			continue
+		}
+		if agent == AgentOpenCode && k == "OPENCODE_CONFIG_DIR" && m.opt.OpenCodeConfigDir != "" {
+			continue // the recorded config directory wins
 		}
 		env = append(env, e)
 	}
@@ -327,6 +354,9 @@ func (m *Manager) env(slot int) []string {
 				env = append(env, k+"="+v)
 			}
 		}
+	}
+	if agent == AgentOpenCode && m.opt.OpenCodeConfigDir != "" {
+		env = append(env, "OPENCODE_CONFIG_DIR="+m.opt.OpenCodeConfigDir)
 	}
 	return append(env, "TERM=xterm-256color", "COLORTERM=truecolor",
 		"CCCTL_SOCK="+m.opt.SockPath, fmt.Sprintf("CCCTL_SLOT=%d", slot))
@@ -354,7 +384,7 @@ func (m *Manager) persistLocked() {
 			continue
 		}
 		i := s.Info()
-		out = append(out, state.Slot{Slot: i.Slot, Task: i.Task, Cwd: i.Cwd, Repo: i.Repo, Worktree: i.Worktree,
+		out = append(out, state.Slot{Slot: i.Slot, Task: i.Task, Agent: string(i.Agent), Cwd: i.Cwd, Repo: i.Repo, Worktree: i.Worktree,
 			Branch: i.Branch, SessionID: i.SessionID, State: string(i.State), LaunchedAt: i.LaunchedAt})
 	}
 	if err := m.opt.Store.Save(out); err != nil {
@@ -378,7 +408,7 @@ func (s *Session) markRunning() {
 	s.info.State = Running
 	i := s.info
 	s.mu.Unlock()
-	logx.Event(s.m.opt.Log, "session_started", "slot", i.Slot, "task", i.Task, "cwd", i.Cwd, "worktree", i.Worktree,
+	logx.Event(s.m.opt.Log, "session_started", "slot", i.Slot, "task", i.Task, "agent", i.Agent, "cwd", i.Cwd, "worktree", i.Worktree,
 		"branch", i.Branch, "session_id", i.SessionID, "resumed", i.Resumed)
 	s.m.persist()
 	s.changed()
@@ -479,11 +509,11 @@ func (s *Session) wait() {
 	dur := time.Since(s.started)
 	if i.Resumed && code != 0 && dur < s.m.opt.ResumeGrace && !s.stopped {
 		i.State, i.Message = ResumeFailed, MsgResumeFailed(i.Task, code)
-		logx.Event(s.m.opt.Log, "resume_failed", "slot", i.Slot, "task", i.Task, "session_id", i.SessionID, "exit_code", code)
+		logx.Event(s.m.opt.Log, "resume_failed", "slot", i.Slot, "task", i.Task, "agent", i.Agent, "session_id", i.SessionID, "exit_code", code)
 	} else {
 		i.State, i.Message = Exited, MsgExited(code, i.Worktree, i.Branch, i.Cwd)
 	}
-	logx.Event(s.m.opt.Log, "session_exited", "slot", i.Slot, "task", i.Task, "exit_code", code,
+	logx.Event(s.m.opt.Log, "session_exited", "slot", i.Slot, "task", i.Task, "agent", i.Agent, "exit_code", code,
 		"duration_s", int(dur.Seconds()), "stopped_by_user", s.stopped)
 	s.mu.Unlock()
 	s.m.persist()
@@ -624,6 +654,13 @@ func (m *Manager) PTYSize(slot int) (uint16, uint16, error) {
 
 // Hook handles a Notification or Stop hook for slot (REQ-008).
 func (m *Manager) Hook(slot int, hook, sessionID string) error {
+	return m.HookSource(slot, hook, sessionID, "")
+}
+
+// HookSource handles a needs-input event and records where it came from. An
+// empty source is inferred from the slot's agent: Claude hooks are the default,
+// OpenCode plugin events are tagged opencode-plugin.
+func (m *Manager) HookSource(slot int, hook, sessionID, source string) error {
 	s, err := m.session(slot)
 	if err != nil {
 		return err
@@ -634,12 +671,18 @@ func (m *Manager) Hook(slot int, hook, sessionID string) error {
 		return nil
 	}
 	i := s.info
+	if source == "" {
+		source = "claude-hook"
+		if i.Agent == AgentOpenCode {
+			source = "opencode-plugin"
+		}
+	}
 	flip := i.State == Running || i.State == Starting
 	if flip {
 		s.info.State = NeedsInput
 	}
 	s.mu.Unlock()
-	logx.Event(m.opt.Log, "needs_input", "slot", slot, "task", i.Task, "hook", hook)
+	logx.Event(m.opt.Log, "needs_input", "slot", slot, "task", i.Task, "hook", hook, "agent", i.Agent, "source", source)
 	if flip {
 		m.persist()
 		s.changed()
@@ -700,12 +743,12 @@ func (m *Manager) Fresh(slot int) (Info, error) {
 	if i.State != ResumeFailed {
 		return Info{}, ValidationError{"Start fresh is only available after a failed resume."}
 	}
-	if err := CheckClaude(m.opt.ClaudePath); err != nil {
+	if err := CheckAgent(i.Agent, m.opt.ClaudePath, m.opt.OpenCodePath); err != nil {
 		return Info{}, invalid(err)
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.startLocked(Info{Slot: i.Slot, Task: i.Task, Cwd: i.Cwd, Repo: i.Repo, Worktree: i.Worktree, Branch: i.Branch}, "", false)
+	return m.startLocked(Info{Slot: i.Slot, Task: i.Task, Agent: i.Agent, Cwd: i.Cwd, Repo: i.Repo, Worktree: i.Worktree, Branch: i.Branch}, "", false)
 }
 
 // Resume relaunches every saved active session with --resume (REQ-009).
@@ -723,7 +766,12 @@ func (m *Manager) Resume() error {
 		if !State(sl.State).Active() || sl.Slot < 1 || sl.Slot > config.MaxSessions {
 			continue
 		}
-		info := Info{Slot: sl.Slot, Task: sl.Task, Cwd: sl.Cwd, Repo: sl.Repo, Worktree: sl.Worktree, Branch: sl.Branch, SessionID: sl.SessionID}
+		agent, err := NormalizeAgent(sl.Agent)
+		if err != nil {
+			m.opt.Log.Error("resume_bad_agent", "slot", sl.Slot, "agent", sl.Agent)
+			continue
+		}
+		info := Info{Slot: sl.Slot, Task: sl.Task, Agent: agent, Cwd: sl.Cwd, Repo: sl.Repo, Worktree: sl.Worktree, Branch: sl.Branch, SessionID: sl.SessionID}
 		if _, err := m.startLocked(info, "", true); err != nil {
 			m.opt.Log.Error("resume_spawn_failed", "slot", sl.Slot, "error", err.Error())
 		}

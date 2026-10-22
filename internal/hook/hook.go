@@ -20,6 +20,7 @@ type Event struct {
 	Slot      int    `json:"slot"`
 	Hook      string `json:"hook"`
 	SessionID string `json:"session_id"`
+	Source    string `json:"source,omitempty"`
 }
 
 // SockPath returns $CCCTL_SOCK or ~/.ccctl/ccctl.sock.
@@ -47,7 +48,7 @@ func Run(slot int, stdin io.Reader) {
 	}
 	b, _ := io.ReadAll(io.LimitReader(stdin, 1<<20))
 	_ = json.Unmarshal(b, &payload)
-	ev := Event{Slot: slot, Hook: payload.HookEventName, SessionID: payload.SessionID}
+	ev := Event{Slot: slot, Hook: payload.HookEventName, SessionID: payload.SessionID, Source: "claude-hook"}
 	if ev.Hook == "" {
 		ev.Hook = "Notification"
 	}

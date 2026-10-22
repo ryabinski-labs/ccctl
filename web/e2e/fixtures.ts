@@ -8,12 +8,15 @@ export interface Controller {
   url: string;
   dir: string;
   home: string;
+  logPath: string;
   proc: ChildProcess;
   /** Launch a session through the REST API (the scenario's Given). */
-  launch(req: { task: string; path: string; worktree?: boolean; prompt?: string }): Promise<{ slot: number }>;
+  launch(req: { task: string; path: string; agent?: 'claude' | 'opencode'; worktree?: boolean; prompt?: string }): Promise<{ slot: number }>;
   /** Bytes the fake claude for `slot` read from its PTY. */
   inputLog(slot: number): Buffer;
-  stateFile(): { version: number; slots: ({ slot: number; session_id: string } | null)[] };
+  /** The controller's JSON-lines log. */
+  log(): string;
+  stateFile(): { version: number; slots: ({ slot: number; agent: string; session_id: string } | null)[] };
   kill(): void;
 }
 
@@ -31,12 +34,13 @@ async function startController(args: string[]): Promise<Controller> {
   });
   // Keep draining stdout so the server never blocks on a full pipe.
   proc.stdout!.resume();
-  const { url, dir } = JSON.parse(first) as { url: string; dir: string };
+  const { url, dir, log } = JSON.parse(first) as { url: string; dir: string; log: string };
   const home = join(dir, 'home');
   const ctl: Controller = {
     url,
     dir,
     home,
+    logPath: log,
     proc,
     async launch(req) {
       const res = await fetch(`${url}/api/sessions`, {
@@ -51,6 +55,9 @@ async function startController(args: string[]): Promise<Controller> {
     inputLog(slot) {
       const p = join(dir, 'fakeclaude', `input-${slot}.bin`);
       return existsSync(p) ? readFileSync(p) : Buffer.alloc(0);
+    },
+    log() {
+      return existsSync(log) ? readFileSync(log, 'utf8') : '';
     },
     stateFile() {
       return JSON.parse(readFileSync(join(home, '.ccctl', 'state.json'), 'utf8'));

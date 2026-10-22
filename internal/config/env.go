@@ -18,7 +18,8 @@ var writeMu sync.Mutex
 // ReservedEnv are names the controller sets itself or strips on purpose.
 func ReservedEnv(name string) bool {
 	return name == "TERM" || name == "COLORTERM" || name == "HOME" || name == "PATH" || strings.HasPrefix(name, "CCCTL_") ||
-		name == "CLAUDECODE" || name == "CLAUDE_CODE_ENTRYPOINT" || name == "CLAUDE_CODE_CHILD_SESSION"
+		name == "CLAUDECODE" || name == "CLAUDE_CODE_ENTRYPOINT" || name == "CLAUDE_CODE_CHILD_SESSION" ||
+		name == "OPENCODE_CONFIG_DIR"
 }
 
 // ValidEnvName is a POSIX-style variable name.

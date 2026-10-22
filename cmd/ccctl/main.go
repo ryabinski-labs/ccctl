@@ -1,4 +1,4 @@
-// Command ccctl runs and manages ccctl, a web controller for Claude Code sessions.
+// Command ccctl runs and manages ccctl, a web controller for Claude Code and OpenCode sessions.
 package main
 
 import (
