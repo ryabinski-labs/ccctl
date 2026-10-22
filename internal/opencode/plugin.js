@@ -2,6 +2,11 @@
 // It reports the two OpenCode events that mean "a human is needed" to the
 // controller's local Unix socket. Outside a ccctl session CCCTL_SLOT is unset,
 // so the plugin does nothing.
+//
+// This is an OpenCode v2 plugin: the default export is a definition with an id
+// and a setup(context) function. OpenCode delivers events as
+// { type, data: { sessionID, ... } }; the v1 { properties } shape is accepted
+// too so the file keeps working across a config migration.
 import http from "node:http"
 
 const NEEDS_INPUT = new Set(["permission.asked", "session.idle"])
@@ -29,13 +34,23 @@ function post(sock, body) {
   })
 }
 
-export const CcctlPlugin = async () => ({
-  event: async ({ event }) => {
-    const slot = Number(process.env.CCCTL_SLOT || 0)
-    const sock = process.env.CCCTL_SOCK || ""
-    if (!slot || !sock || !event || !NEEDS_INPUT.has(event.type)) return
-    const props = event.properties || {}
-    const sessionID = props.sessionID || props.sessionId || event.sessionID || ""
-    await post(sock, { slot, hook: event.type, session_id: sessionID })
+export default {
+  id: "ccctl",
+  async setup(ctx) {
+    const abort = new AbortController()
+    const run = async () => {
+      for await (const raw of ctx.event.subscribe({ signal: abort.signal })) {
+        const event = raw && raw.event ? raw.event : raw
+        if (!event || !NEEDS_INPUT.has(event.type)) continue
+        const slot = Number(process.env.CCCTL_SLOT || 0)
+        const sock = process.env.CCCTL_SOCK || ""
+        if (!slot || !sock) continue
+        const data = event.data || event.properties || {}
+        const sessionID = data.sessionID || data.sessionId || event.sessionID || ""
+        await post(sock, { slot, hook: event.type, session_id: sessionID })
+      }
+    }
+    void run().catch(() => {})
+    return () => abort.abort()
   },
-})
+}
