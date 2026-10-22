@@ -103,6 +103,27 @@ func TestSc001EMissingOpenCodeBinary(t *testing.T) {
 	}
 }
 
+// SC-001-f
+func TestSc001FOpenCodeSessionID(t *testing.T) {
+	id := session.NewSessionID(session.AgentOpenCode)
+	if !strings.HasPrefix(id, session.OpenCodeSessionPrefix) {
+		t.Fatalf("OpenCode ID = %q, want ses_ prefix", id)
+	}
+	if !session.ValidSessionID(session.AgentOpenCode, id) {
+		t.Fatalf("OpenCode ID %q rejected by ValidSessionID", id)
+	}
+	if strings.Contains(id[len(session.OpenCodeSessionPrefix):], "-") {
+		t.Fatalf("OpenCode ID = %q, want no UUID hyphens", id)
+	}
+	cid := session.NewSessionID(session.AgentClaude)
+	if _, err := uuid.Parse(cid); err != nil {
+		t.Fatalf("Claude ID = %q: %v", cid, err)
+	}
+	if session.ValidSessionID(session.AgentOpenCode, cid) {
+		t.Fatalf("Claude UUID %q passed the OpenCode check", cid)
+	}
+}
+
 // SC-002-b
 func TestSc002BSeventhMixedLaunchRefused(t *testing.T) {
 	h := tu.Start(t, tu.Opts{})
@@ -194,7 +215,8 @@ func TestSc003DTypingClearsOpenCodeNeedsInput(t *testing.T) {
 
 // SC-005-a
 func TestSc005AMixedSessionsResume(t *testing.T) {
-	ids := []string{uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()}
+	opencodeID := func() string { return session.OpenCodeSessionPrefix + strings.ReplaceAll(uuid.NewString(), "-", "") }
+	ids := []string{uuid.NewString(), opencodeID(), uuid.NewString(), opencodeID(), uuid.NewString()}
 	var cwds []string
 	agents := []string{"claude", "opencode", "claude", "opencode", "claude"}
 	h := tu.Start(t, tu.Opts{ResumeGrace: 200 * time.Millisecond, Setup: func(home string) {
@@ -249,7 +271,7 @@ func TestSc005AMixedSessionsResume(t *testing.T) {
 
 // SC-005-b
 func TestSc005BFailedOpenCodeResume(t *testing.T) {
-	id := uuid.NewString()
+	id := session.OpenCodeSessionPrefix + strings.ReplaceAll(uuid.NewString(), "-", "")
 	h := tu.Start(t, tu.Opts{ResumeGrace: 2 * time.Second, Modes: map[int]string{2: "resume-fail"}, Setup: func(home string) {
 		d := filepath.Join(home, "Documents", "rf")
 		os.MkdirAll(d, 0o755)
@@ -269,7 +291,7 @@ func TestSc005BFailedOpenCodeResume(t *testing.T) {
 
 // SC-005-c
 func TestSc005CStartFreshKeepsOpenCode(t *testing.T) {
-	id := uuid.NewString()
+	id := session.OpenCodeSessionPrefix + strings.ReplaceAll(uuid.NewString(), "-", "")
 	cwd := ""
 	h := tu.Start(t, tu.Opts{ResumeGrace: 2 * time.Second, Modes: map[int]string{2: "resume-fail"}, Setup: func(home string) {
 		cwd = filepath.Join(home, "Documents", "rf")
@@ -297,6 +319,34 @@ func TestSc005CStartFreshKeepsOpenCode(t *testing.T) {
 	}
 	if r.Info.Worktree != old.Worktree || r.Info.Branch != old.Branch {
 		t.Fatalf("worktree/branch changed: %+v -> %+v", old, r.Info)
+	}
+}
+
+// SC-005-d
+func TestSc005DLegacyOpenCodeSessionIDRepaired(t *testing.T) {
+	legacy := uuid.NewString()
+	var cwd string
+	h := tu.Start(t, tu.Opts{Setup: func(home string) {
+		cwd = filepath.Join(home, "Documents", "legacy")
+		os.MkdirAll(cwd, 0o755)
+		if err := state.NewStore(config.Dir(home)).Save([]state.Slot{{Slot: 1, Task: "legacy", Agent: "opencode", Cwd: cwd, SessionID: legacy, State: "running"}}); err != nil {
+			t.Fatal(err)
+		}
+	}})
+	tu.Eventually(t, 10*time.Second, func() bool { return len(h.OpenCodeInvocations()) == 1 }, "legacy OpenCode slot did not start")
+	inv := h.OpenCodeInvocations()[0]
+	argv := strings.Join(argvOf(inv), " ")
+	if strings.Contains(argv, legacy) {
+		t.Fatalf("legacy UUID was passed to OpenCode: %q", argv)
+	}
+	if !strings.Contains(argv, "--session "+session.OpenCodeSessionPrefix) {
+		t.Fatalf("argv = %q", argv)
+	}
+	if got := h.Slot(1).SessionID; !strings.HasPrefix(got, session.OpenCodeSessionPrefix) {
+		t.Fatalf("slot session ID = %q", got)
+	}
+	if ev := h.Log.Events("resume_bad_session_id"); len(ev) != 1 {
+		t.Fatalf("resume_bad_session_id events = %v", ev)
 	}
 }
 
