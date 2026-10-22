@@ -87,7 +87,7 @@ func TestSc006CPluginWritten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range []string{opencode.Marker, "permission.asked", "session.idle", "CCCTL_SOCK", "CCCTL_SLOT"} {
+	for _, s := range []string{opencode.Marker, "permission.asked", "session.idle", "CCCTL_SOCK", "CCCTL_SLOT", "export default", `id: "ccctl"`, "setup"} {
 		if !strings.Contains(string(b), s) {
 			t.Errorf("plugin is missing %q", s)
 		}

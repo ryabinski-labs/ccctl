@@ -3,7 +3,7 @@ feature: opencode-support
 title: OpenCode sessions alongside Claude Code
 source:
   prd: docs/prd/opencode-support.md
-  prd_sha256: f448e72044e6d9da87c7b763083ccbbef26eea6164f66476fc1f9a12c50b49ee
+  prd_sha256: cbaff2623ec73943664b65a53b65364187c94723de45e2205e826cfe2c41a205
 defaults:
   priority: P2
 non_goals:
@@ -136,7 +136,7 @@ requirements:
         status: "green"
         tags: [slots, argv]
   - id: REQ-003
-    text: An OpenCode pane flips to needs-input when the installed plugin reports permission.asked or session.idle, clears on input, and ignores events for another session.
+    text: An OpenCode pane flips to needs-input when the installed OpenCode v2 plugin reports permission.asked or session.idle, clears on input, and ignores events for another session.
     priority: P0
     type: functional
     prd_ref: "§5 story 2; §9; §13; DL-002"
@@ -154,8 +154,8 @@ requirements:
         tags: [needs-input, core]
       - id: SC-003-b
         level: integration
-        title: Plugin posts both OpenCode events and no-ops outside ccctl
-        given: the ccctl OpenCode plugin source and a fake Unix socket server
+        title: OpenCode v2 plugin posts both events and no-ops outside ccctl
+        given: the ccctl OpenCode plugin source, a fake Unix socket server, and OpenCode v2 events with data.sessionID
         when: the plugin receives permission.asked and session.idle with CCCTL_SLOT set, then receives an event with CCCTL_SLOT unset
         then: both set-slot events post slot, hook, and session_id; the unset event posts nothing
         oracle: "socket received exactly 2 POSTs with body {'slot':1,'hook':'permission.asked','session_id':'ses_x'} and {'slot':1,'hook':'session.idle','session_id':'ses_x'}; POST count after the unset event is still 2"
@@ -189,6 +189,17 @@ requirements:
         test_ref: "internal/tdd/opencode_test.go::TestSc003DTypingClearsOpenCodeNeedsInput"
         status: "green"
         tags: [needs-input, input]
+      - id: SC-003-e
+        level: unit
+        title: OpenCode plugin uses the v2 default definition
+        given: OpenCode v2 loads plugins from a default export with an id and a setup function
+        when: the generated plugin module is imported
+        then: its default export has id ccctl and a setup function that subscribes through ctx.event
+        oracle: "module.default.id == 'ccctl' and typeof module.default.setup == 'function'"
+        doubles: real Node runtime; no OpenCode process
+        test_ref: "web/src/tdd/opencode_plugin.tdd.spec.ts::SC-003-e"
+        status: "green"
+        tags: [plugin, regression, contract]
   - id: REQ-004
     text: Every pane shows its agent's name in the header and in its accessible name, and a session saved without an agent is labelled Claude Code.
     priority: P0
