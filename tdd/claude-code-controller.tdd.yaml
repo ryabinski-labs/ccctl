@@ -306,6 +306,30 @@ requirements:
     - playwright
     test_ref: web/e2e/grid.spec.ts::The grid reflows as sessions are added and stops at six
     status: green
+  - id: SC-004-h
+    level: acceptance
+    title: A short window fits the page, keeping the bottom of every pane visible
+    given: one running session and a 1024x560 browser window (shorter than the old 600 px shell minimum)
+    when: the page loads
+    then: the page does not scroll and every visible pane bottom is inside the viewport
+    oracle: document scrollHeight == innerHeight AND every visible pane bottom <= innerHeight AND document scrollWidth <= innerWidth
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - playwright
+    test_ref: 'web/e2e/page_basics.spec.ts::SC-004-h A short window fits the page: no pane bottom is clipped'
+    status: green
+  - id: SC-004-i
+    level: acceptance
+    title: Refresh re-fits and redraws the terminals without losing output or input
+    given: one running session with output in pane 1
+    when: the owner clicks Refresh in the header
+    then: pane 1 keeps its output and still accepts typing
+    oracle: pane 1 text still contains FAKE_CLAUDE after the click AND typing after the refresh reaches the session's input log
+    doubles: fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - playwright
+    test_ref: 'web/e2e/page_basics.spec.ts::SC-004-i Refresh re-fits the terminals without losing their output or input'
+    status: green
   - id: SC-004-f
     level: acceptance
     title: End-to-end output latency over the tailnet

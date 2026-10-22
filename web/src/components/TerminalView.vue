@@ -74,6 +74,12 @@ function refit() {
   resizeTimer = setTimeout(sendSize, 80);
 }
 
+function refreshView() {
+  refit();
+  if (!term || !term.element) return;
+  term.refresh(0, term.rows - 1);
+}
+
 function bufferText(): string {
   if (!term) return '';
   const buf = term.buffer.active;
@@ -198,6 +204,7 @@ onMounted(async () => {
     reset: () => term?.reset(),
     focus: () => term?.focus(),
     text: bufferText,
+    refresh: refreshView,
     attach: (files) => void attach(files),
   };
   terminalBus.register(props.slot, sink);

@@ -51,7 +51,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 .shell {
   display: flex;
   flex-direction: column;
+  /* Fit the visible viewport exactly: a fixed minimum height made the page
+     scroll, which hid the header and clipped the bottom of the terminals. */
   height: 100vh;
-  min-height: 600px;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 </style>

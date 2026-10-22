@@ -7,6 +7,8 @@ export interface TerminalSink {
   reset(): void;
   focus(): void;
   text(): string;
+  /** Re-fits the terminal to its pane and redraws the visible rows. */
+  refresh(): void;
   /** Uploads files to the host and pastes their paths into the session. */
   attach(files: File[]): void;
 }
@@ -40,6 +42,10 @@ export const terminalBus = {
     const s = sinks.get(slot);
     s?.focus();
     return !!s;
+  },
+  /** Re-fit and redraw every mounted terminal (after sleep, zoom or a resize glitch). */
+  refreshAll() {
+    for (const s of sinks.values()) s.refresh();
   },
   text(slot: number): string {
     return sinks.get(slot)?.text() ?? '';

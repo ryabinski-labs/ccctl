@@ -223,6 +223,24 @@
 - **Test doubles:** fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
 - **Test:** `web/e2e/grid.spec.ts::The grid reflows as sessions are added and stops at six`
 
+#### SC-004-h — A short window fits the page, keeping the bottom of every pane visible  `acceptance` `green`
+
+- **Given** one running session and a 1024x560 browser window (shorter than the old 600 px shell minimum)
+- **When** the page loads
+- **Then** the page does not scroll and every visible pane bottom is inside the viewport
+- **Oracle:** document scrollHeight == innerHeight AND every visible pane bottom <= innerHeight AND document scrollWidth <= innerWidth
+- **Test doubles:** fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+- **Test:** `web/e2e/page_basics.spec.ts::SC-004-h A short window fits the page`
+
+#### SC-004-i — Refresh re-fits and redraws the terminals without losing output or input  `acceptance` `green`
+
+- **Given** one running session with output in pane 1
+- **When** the owner clicks Refresh in the header
+- **Then** pane 1 keeps its output and still accepts typing
+- **Oracle:** pane 1 text still contains FAKE_CLAUDE after the click AND typing after the refresh reaches the session's input log
+- **Test doubles:** fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
+- **Test:** `web/e2e/page_basics.spec.ts::SC-004-i Refresh re-fits the terminals`
+
 #### SC-004-f — End-to-end output latency over the tailnet  `acceptance` `red`
 
 - **Given** the controller on mac-mini with 6 busy sessions and the page open on laptop
