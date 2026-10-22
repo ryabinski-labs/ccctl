@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"github.com/google/uuid"
 
 	"github.com/ryabinski-labs/ccctl/internal/config"
 	"github.com/ryabinski-labs/ccctl/internal/logx"
@@ -270,11 +269,11 @@ func (m *Manager) resumeByIDLocked(slot int, task string, req LaunchRequest) (In
 
 // startLocked spawns the selected agent for info in info.Slot, replacing whatever was there. m.mu held.
 func (m *Manager) startLocked(info Info, prompt string, resume bool) (Info, error) {
-	if !resume {
-		info.SessionID = uuid.NewString()
-	}
 	if !info.Agent.Valid() {
 		info.Agent = AgentClaude
+	}
+	if !resume {
+		info.SessionID = NewSessionID(info.Agent)
 	}
 	info.State, info.Resumed, info.LaunchedAt, info.ExitCode, info.Message = Starting, resume, time.Now().UTC(), nil, ""
 	settings := ""
@@ -771,7 +770,15 @@ func (m *Manager) Resume() error {
 			m.opt.Log.Error("resume_bad_agent", "slot", sl.Slot, "agent", sl.Agent)
 			continue
 		}
-		info := Info{Slot: sl.Slot, Task: sl.Task, Agent: agent, Cwd: sl.Cwd, Repo: sl.Repo, Worktree: sl.Worktree, Branch: sl.Branch, SessionID: sl.SessionID}
+		id := sl.SessionID
+		if !ValidSessionID(agent, id) {
+			// ccctl v0.1.42 and earlier generated UUIDs for OpenCode, which
+			// OpenCode rejects. No OpenCode session was created with that ID, so
+			// a fresh "ses" ID is the only recoverable path.
+			id = NewSessionID(agent)
+			logx.Event(m.opt.Log, "resume_bad_session_id", "slot", sl.Slot, "agent", agent, "old_session_id", sl.SessionID, "session_id", id)
+		}
+		info := Info{Slot: sl.Slot, Task: sl.Task, Agent: agent, Cwd: sl.Cwd, Repo: sl.Repo, Worktree: sl.Worktree, Branch: sl.Branch, SessionID: id}
 		if _, err := m.startLocked(info, "", true); err != nil {
 			m.opt.Log.Error("resume_spawn_failed", "slot", sl.Slot, "error", err.Error())
 		}

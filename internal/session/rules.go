@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/ryabinski-labs/ccctl/internal/config"
 )
 
@@ -125,6 +127,24 @@ func CheckAgent(agent Agent, claudePath, openCodePath string) error {
 		return nil
 	}
 	return CheckClaude(claudePath)
+}
+
+// OpenCodeSessionPrefix is required by OpenCode: its session IDs must start
+// with "ses". Claude Code uses a UUID.
+const OpenCodeSessionPrefix = "ses_"
+
+// NewSessionID returns a fresh session ID for agent.
+func NewSessionID(agent Agent) string {
+	if agent == AgentOpenCode {
+		return OpenCodeSessionPrefix + strings.ReplaceAll(uuid.NewString(), "-", "")
+	}
+	return uuid.NewString()
+}
+
+// ValidSessionID reports whether id is usable for agent. Claude Code accepts the
+// UUIDs ccctl has always generated; OpenCode requires the "ses" prefix.
+func ValidSessionID(agent Agent, id string) bool {
+	return agent != AgentOpenCode || strings.HasPrefix(id, OpenCodeSessionPrefix)
 }
 
 // FreshArgv builds the Claude launch argv (§12). A prompt starting with "-" is

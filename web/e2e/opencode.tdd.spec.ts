@@ -23,8 +23,8 @@ test.describe('REQ-001 — Launch either agent with its own argv and record the 
       .toMatch(/FAKE_OPENCODE cwd=\S*\/folio-wt-fix-login/);
     expect(text).toContain('--auto');
     expect(text).toContain('prompt=hello world');
-    const m = /--session ([0-9a-f-]{36})/.exec(text);
-    expect(m, 'banner shows --session UUID').not.toBeNull();
+    const m = /--session (ses_[A-Za-z0-9]+)/.exec(text);
+    expect(m, 'banner shows --session ses_ ID').not.toBeNull();
     expect(controller.stateFile().slots[0]?.agent).toBe('opencode');
     expect(controller.stateFile().slots[0]?.session_id).toBe(m![1]);
   });
