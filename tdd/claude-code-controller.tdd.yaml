@@ -330,6 +330,30 @@ requirements:
     - playwright
     test_ref: 'web/e2e/page_basics.spec.ts::SC-004-i Refresh re-fits the terminals without losing their output or input'
     status: green
+  - id: SC-004-j
+    level: acceptance
+    title: Refresh re-asserts the grid after a missed resize frame
+    given: one running session and a socket that drops the browser's next resize frame
+    when: the window changes shape and the owner clicks Refresh
+    then: the host is told the browser's real grid again, so it repaints the whole pane
+    oracle: before the click the host reports the old column count; after it the host reports the browser's new column count
+    doubles: fake claude binary (testdata/fakeclaude) with '!size'; fake Tailscale status and WhoIs; real PTYs
+    tags:
+    - playwright
+    test_ref: 'web/e2e/page_basics.spec.ts::SC-004-j Refresh heals a host that missed a resize frame'
+    status: green
+  - id: SC-004-k
+    level: unit
+    title: A reconnect re-asserts every terminal size
+    given: a page with a mounted terminal
+    when: the controller sends hello after a reconnect
+    then: every mounted terminal re-sends its rows and columns
+    oracle: terminalBus.syncSizes is called once per hello
+    doubles: mocked session store and terminal bus
+    tags:
+    - vitest
+    test_ref: 'web/src/tdd/claude_code_controller.tdd.spec.ts::SC-004-k A reconnect re-asserts every terminal size'
+    status: green
   - id: SC-004-f
     level: acceptance
     title: End-to-end output latency over the tailnet
@@ -949,6 +973,18 @@ requirements:
     - nfr
     - manual
     status: red
+  - id: SC-012-g
+    level: unit
+    title: Upgrade keeps the recorded claude path without claude on PATH
+    given: a config with a claude_path that still exists and a PATH search that cannot find claude
+    when: RecordClaudePath runs during an upgrade
+    then: the install keeps the recorded path instead of failing
+    oracle: RecordClaudePath returns nil and claude_path is unchanged; with no recorded path it still returns an error
+    doubles: temp HOME; fake PATH
+    tags:
+    - go
+    test_ref: internal/tdd/install_test.go::SC-012-g
+    status: green
 - id: REQ-013
   text: 'Non-functional budgets from §13 hold: controller-added latency p95 <= 20 ms with 6 busy sessions, controller RSS
     <= 150 MB, page first load <= 2 s over the tailnet, binary <= 30 MB per platform.'

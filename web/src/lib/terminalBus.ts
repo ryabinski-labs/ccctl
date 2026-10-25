@@ -9,6 +9,10 @@ export interface TerminalSink {
   text(): string;
   /** Re-fits the terminal to its pane and redraws the visible rows. */
   refresh(): void;
+  /** Sends the terminal's current rows and cols to the controller again. */
+  syncSize(): void;
+  /** Current grid size in cells. */
+  size(): { rows: number; cols: number };
   /** Uploads files to the host and pastes their paths into the session. */
   attach(files: File[]): void;
 }
@@ -47,8 +51,15 @@ export const terminalBus = {
   refreshAll() {
     for (const s of sinks.values()) s.refresh();
   },
+  /** Re-send every mounted terminal's grid, e.g. after a reconnect dropped a resize frame. */
+  syncSizes() {
+    for (const s of sinks.values()) s.syncSize();
+  },
   text(slot: number): string {
     return sinks.get(slot)?.text() ?? '';
+  },
+  size(slot: number): { rows: number; cols: number } | null {
+    return sinks.get(slot)?.size() ?? null;
   },
   attach(slot: number, files: File[]) {
     sinks.get(slot)?.attach(files);
@@ -57,11 +68,17 @@ export const terminalBus = {
 
 declare global {
   interface Window {
-    __ccctl?: { text(slot: number): string };
+    __ccctl?: {
+      text(slot: number): string;
+      size(slot: number): { rows: number; cols: number } | null;
+    };
   }
 }
 
 if (typeof window !== 'undefined') {
-  // Read-only hook used by the headless acceptance tests to read a pane's buffer.
-  window.__ccctl = { text: (slot: number) => terminalBus.text(slot) };
+  // Read-only hook used by the headless acceptance tests to read a pane's buffer and grid.
+  window.__ccctl = {
+    text: (slot: number) => terminalBus.text(slot),
+    size: (slot: number) => terminalBus.size(slot),
+  };
 }

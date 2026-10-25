@@ -61,8 +61,19 @@ const newTitle = computed(() => (store.canLaunch ? 'Start a session in the next 
 
 // Re-fit and redraw the terminals without dropping their sessions, for when a
 // pane comes back from sleep or a browser resize with clipped or stale rows.
+const reloadBtn = ref<HTMLButtonElement | null>(null);
 function refreshViews() {
   terminalBus.refreshAll();
+  store.announce('Terminal views refreshed');
+  // One clockwise turn confirms the click even when the screen already looked
+  // right; skipped for people who ask for reduced motion.
+  const icon = reloadBtn.value?.querySelector('svg');
+  if (icon && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    icon.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], {
+      duration: 480,
+      easing: 'cubic-bezier(.2, .8, .2, 1)',
+    });
+  }
 }
 </script>
 
@@ -149,12 +160,14 @@ function refreshViews() {
         <span class="pill" aria-hidden="true">{{ store.muted ? 'Off' : 'On' }}</span>
       </button>
 
+      <span class="tool-rule" aria-hidden="true" />
       <button
         type="button"
-        class="btn btn--ghost btn--sm refresh"
+        ref="reloadBtn"
+        class="reload"
         data-testid="refresh-view"
         aria-label="Refresh terminal views"
-        title="Refresh the view (re-fit and redraw every terminal)"
+        title="Re-fit, re-sync and redraw every terminal"
         @click="refreshViews"
       >
         <AppIcon name="refresh" :size="16" />
@@ -261,11 +274,38 @@ function refreshViews() {
 .toggle {
   color: var(--ink-2);
 }
-.refresh {
+.reload {
+  display: inline-grid;
+  place-items: center;
   width: 28px;
+  height: 28px;
+  flex: none;
   padding: 0;
-  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--rule-2);
+  background: var(--panel);
   color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 80ms ease;
+}
+.reload:hover {
+  background: var(--paper-2);
+  border-color: var(--ink-2);
+  color: var(--ink);
+}
+.reload:active {
+  transform: translateY(1px);
+}
+.tool-rule {
+  width: 1px;
+  height: 18px;
+  flex: none;
+  margin: 0 2px;
+  background: var(--rule);
 }
 .pill {
   display: inline-block;

@@ -90,6 +90,9 @@ export const useSessions = defineStore('sessions', {
         this.slots[i] = next;
       }
       this.syncTitle();
+      // A resize sent while the socket was down never reached the host, and the
+      // PTY would stay on the old grid. Every (re)connect re-asserts the size.
+      terminalBus.syncSizes();
     },
 
     applySlot(slot: number, info: SlotInfo | null) {
@@ -168,8 +171,8 @@ export const useSessions = defineStore('sessions', {
       this.conn?.sendInput(slot, data);
     },
 
-    resize(slot: number, rows: number, cols: number) {
-      this.conn?.resize(slot, rows, cols);
+    resize(slot: number, rows: number, cols: number): boolean {
+      return this.conn?.resize(slot, rows, cols) ?? false;
     },
   },
 });

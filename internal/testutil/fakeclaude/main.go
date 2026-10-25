@@ -140,6 +140,11 @@ func handle(line, slot, settings, sessionID string) {
 	case strings.HasPrefix(line, "!copy "):
 		// Like Claude Code's selection copy: an OSC 52 clipboard write.
 		fmt.Printf("\x1b]52;c;%s\x07COPIED\r\n", base64.StdEncoding.EncodeToString([]byte(strings.TrimPrefix(line, "!copy "))))
+	case line == "!size":
+		// Current PTY grid, so tests can prove the browser and host agree.
+		if cols, rows, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+			fmt.Printf("SIZE %d %d\r\n", cols, rows)
+		}
 	case strings.HasPrefix(line, "print "):
 		var a, b int
 		fmt.Sscanf(line, "print %d %d", &a, &b)

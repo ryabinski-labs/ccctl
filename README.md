@@ -98,7 +98,7 @@ Settings holds the one folder that New session scans for repos and the environme
 - **Files and images.** Paste a file or screenshot onto a pane, drop one on it, or use the paperclip button in the pane header. ccctl saves it on the host in `~/.ccctl/uploads` (up to 25 MB each; ccctl removes its own uploads after 14 days and refuses new ones once the folder passes 1 GB) and types its path into the session, which is how the agent attaches an image. Pasting text works as in any terminal.
 - **Restarts.** Live sessions are recorded in `~/.ccctl/state.json` (version 2, with each pane's `agent`) and resumed with `claude --resume` or `opencode --session` when ccctl starts again.
 - **Scrollback.** Each session keeps its last 1 MiB of output in memory and replays it when a browser connects.
-- **View refresh.** The header's **Refresh** button re-fits and redraws every terminal without stopping its session, which clears stale rows after sleep, browser zoom, or a resize. The page always fits the window, so short windows keep the header and each terminal's input line in view.
+- **View refresh.** The header's **Refresh** key re-measures the grid, re-sends the size a dropped frame never delivered, clears the glyph atlas, and redraws every terminal without stopping its session. That heals a pane that came back from sleep or a browser zoom painting only part of its width or height. Every reconnect also re-asserts the size, so a terminal and its host cannot drift apart. The page always fits the window, so short windows keep the header and each terminal's input line in view.
 
 ## Install
 
