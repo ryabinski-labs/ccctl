@@ -55,29 +55,54 @@ const THEME = {
   brightWhite: '#ffffff',
 };
 
-function sendSize() {
+function sendSize(force = false) {
   if (!term) return;
   const key = `${term.rows}x${term.cols}`;
-  if (key === lastSize) return;
-  lastSize = key;
-  store.resize(props.slot, term.rows, term.cols);
+  if (!force && key === lastSize) return;
+  // Only remember a size the controller actually took. A frame sent while the
+  // socket is down never leaves the browser, and the PTY would stay on the old
+  // grid; leaving lastSize empty makes the next connect re-assert it.
+  lastSize = store.resize(props.slot, term.rows, term.cols) ? key : '';
 }
 
-function refit() {
+function remeasure() {
+  // FitAddon divides the pane by the last measured cell size. After a webfont
+  // swap, browser zoom or a DPR change that measurement can be stale, so fit
+  // yields a grid smaller than the pane and the terminal paints to a fraction
+  // of it. Re-measure through the same private service xterm's FitAddon uses.
+  const core = (term as unknown as { _core?: { _charSizeService?: { measure(): void } } })?._core;
+  try {
+    core?._charSizeService?.measure();
+  } catch {
+    /* private API changed; fit still works with the current metrics */
+  }
+}
+
+function refit(force = false) {
   if (!fit || !host.value || host.value.clientWidth === 0 || host.value.clientHeight === 0) return;
+  remeasure();
   try {
     fit.fit();
   } catch {
     return;
   }
   if (resizeTimer) clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(sendSize, 80);
+  if (force) sendSize(true);
+  else resizeTimer = setTimeout(() => sendSize(), 80);
 }
 
 function refreshView() {
-  refit();
-  if (!term || !term.element) return;
-  term.refresh(0, term.rows - 1);
+  if (!term) return;
+  refit(true);
+  // Paint after the browser has applied the new grid, from a clean glyph atlas:
+  // a WebGL renderer that survived sleep can keep stale textures and rows.
+  const paint = () => {
+    if (!term) return;
+    term.clearTextureAtlas();
+    term.refresh(0, term.rows - 1);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(paint);
+  else paint();
 }
 
 function bufferText(): string {
@@ -205,6 +230,8 @@ onMounted(async () => {
     focus: () => term?.focus(),
     text: bufferText,
     refresh: refreshView,
+    syncSize: () => sendSize(true),
+    size: () => ({ rows: term?.rows ?? 0, cols: term?.cols ?? 0 }),
     attach: (files) => void attach(files),
   };
   terminalBus.register(props.slot, sink);

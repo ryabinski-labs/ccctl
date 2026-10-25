@@ -77,8 +77,10 @@ export class Connection {
     if (this.ws?.readyState === 1) this.ws.send(encodeInput(slot, data));
   }
 
-  resize(slot: number, rows: number, cols: number): void {
-    if (this.ws?.readyState === 1) this.ws.send(JSON.stringify({ type: 'resize', slot, rows, cols }));
+  resize(slot: number, rows: number, cols: number): boolean {
+    if (this.ws?.readyState !== 1) return false;
+    this.ws.send(JSON.stringify({ type: 'resize', slot, rows, cols }));
+    return true;
   }
 
   private handle(data: unknown) {

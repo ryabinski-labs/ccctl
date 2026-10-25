@@ -51,7 +51,10 @@ defineProps<{ name: string; size?: number }>();
       <circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M17 6l3 3M15 8l2 2" />
     </template>
     <template v-else-if="name === 'refresh'">
-      <path d="M20 11a8 8 0 1 0-2.3 5.7" /><path d="M20 5v6h-6" />
+      <!-- A ring with a solid head stays legible at 16 px; the old corner hook
+           read as a "C" with a nub. -->
+      <path d="M17.9 8.6A7.2 7.2 0 1 1 15.1 5.1" />
+      <path d="M12.6 7.4 17.9 6.2 14.9 2.2z" fill="currentColor" stroke="none" />
     </template>
     <template v-else-if="name === 'folder'">
       <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />

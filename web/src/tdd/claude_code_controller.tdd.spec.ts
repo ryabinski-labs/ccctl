@@ -41,6 +41,7 @@ import { api } from '../lib/api';
 import { chime } from '../lib/chime';
 import { Connection } from '../lib/connection';
 import { bannerText } from '../lib/backoff';
+import { terminalBus } from '../lib/terminalBus';
 import { useSessions } from '../stores/sessions';
 import AppHeader from '../components/AppHeader.vue';
 import LaunchDialog from '../components/LaunchDialog.vue';
@@ -115,6 +116,14 @@ describe('REQ-004 — The owner sees every session\'s live output in its own pan
     expect(visible()).toHaveLength(4);
     expect((w.get('[data-testid="grid"]').element as HTMLElement).style.gridTemplateColumns).toBe('repeat(2, 1fr)');
     w.unmount();
+  });
+
+  it('SC-004-k A reconnect re-asserts every terminal size', () => {
+    const store = useSessions();
+    const sync = vi.spyOn(terminalBus, 'syncSizes').mockImplementation(() => {});
+    store.applyHello({ type: 'hello', host: 'mac-mini', login: 'owner', version: 'v1', slots: [info(1, 'running'), null, null, null] });
+    expect(sync).toHaveBeenCalledTimes(1);
+    sync.mockRestore();
   });
 });
 

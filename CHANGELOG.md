@@ -4,7 +4,7 @@ Notable changes to ccctl. Release binaries and their notes are on the [Releases 
 
 ## Unreleased
 
-- The page now fits the browser window at any height, so the header stays in view and the bottom of a terminal (the prompt and input line) is no longer clipped below the fold. A **Refresh** button in the header re-fits and redraws every terminal without stopping its session, for when panes come back from sleep or a browser resize looking stale.
+- The page now fits the browser window at any height, so the header stays in view and the bottom of a terminal (the prompt and input line) is no longer clipped below the fold. The header's **Refresh** key re-measures the font grid, re-sends the terminal size when a dropped frame left the host painting an old size, clears the glyph atlas, and redraws every pane without stopping its session. Before, the button repainted the same stale grid, so a terminal that came back from sleep still filled only part of its pane.
 - Run OpenCode 2.1.3 or newer alongside Claude Code. New session gains an **Agent** choice (Claude Code or OpenCode); both share the six slots, worktrees, uploads, scrollback, stop/close, and restart resume. `ccctl install` records `opencode_path` and writes the ccctl needs-input plugin to `~/.config/opencode/plugins/ccctl.js` (or `$OPENCODE_CONFIG_DIR/plugins/`), and `ccctl uninstall` removes it. Resume by ID stays Claude Code only; OpenCode sessions resume from the ID ccctl created.
 - `ccctl install` on Linux now restarts the service, so an upgrade takes effect. Before, `systemctl --user enable --now` left the old binary running.
 - Settings keeps a repository folder you type before the saved one has loaded. Before, the loaded value replaced what you typed, and Save folder stayed disabled.

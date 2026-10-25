@@ -221,3 +221,44 @@ func TestSc012DInstallRecordsClaudePathAndSecuresConfig(t *testing.T) {
 		t.Fatalf("config mode = %o, want 600", st.Mode().Perm())
 	}
 }
+
+func TestSc012GUpgradeKeepsRecordedClaudePath(t *testing.T) {
+	// SC-012-g (REQ-012, P1, unit)
+	// Oracle: with no claude on PATH, an existing recorded path that still
+	// exists is kept and the config is unchanged; without one, install errors.
+	home := t.TempDir()
+	claude := filepath.Join(home, ".local", "bin", "claude")
+	if err := os.MkdirAll(filepath.Dir(claude), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(claude, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := filepath.Join(home, ".ccctl", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfgPath, []byte("claude_path = \""+claude+"\"\nport = 7700\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	missing := func(string) (string, error) { return "", errors.New("executable file not found in $PATH") }
+	if err := install.RecordClaudePath(cfgPath, missing); err != nil {
+		t.Fatalf("RecordClaudePath with a recorded path: %v", err)
+	}
+	var cfg struct {
+		ClaudePath string `toml:"claude_path"`
+		Port       int    `toml:"port"`
+	}
+	if _, err := toml.DecodeFile(cfgPath, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ClaudePath != claude || cfg.Port != 7700 {
+		t.Fatalf("config changed: %+v", cfg)
+	}
+
+	// No recorded path: the install still fails as before.
+	empty := filepath.Join(home, "empty", "config.toml")
+	if err := install.RecordClaudePath(empty, missing); err == nil {
+		t.Fatal("RecordClaudePath with no claude and no recorded path = nil, want error")
+	}
+}

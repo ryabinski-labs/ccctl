@@ -241,6 +241,24 @@
 - **Test doubles:** fake claude binary (testdata/fakeclaude) on claude_path; fake Tailscale status and WhoIs; real PTYs
 - **Test:** `web/e2e/page_basics.spec.ts::SC-004-i Refresh re-fits the terminals`
 
+#### SC-004-j — Refresh re-asserts the grid after a missed resize frame  `acceptance` `green`
+
+- **Given** one running session and a socket that drops the browser's next resize frame
+- **When** the window changes shape and the owner clicks Refresh
+- **Then** the host is told the browser's real grid again, so it repaints the whole pane
+- **Oracle:** before the click the host reports the old column count; after it the host reports the browser's new column count
+- **Test doubles:** fake claude binary (testdata/fakeclaude) with `!size`; fake Tailscale status and WhoIs; real PTYs
+- **Test:** `web/e2e/page_basics.spec.ts::SC-004-j Refresh heals a host that missed a resize frame`
+
+#### SC-004-k — A reconnect re-asserts every terminal size  `unit` `green`
+
+- **Given** a page with a mounted terminal
+- **When** the controller sends `hello` after a reconnect
+- **Then** every mounted terminal re-sends its rows and columns
+- **Oracle:** `terminalBus.syncSizes` is called once per `hello`
+- **Test doubles:** mocked session store and terminal bus
+- **Test:** `web/src/tdd/claude_code_controller.tdd.spec.ts::SC-004-k A reconnect re-asserts every terminal size`
+
 #### SC-004-f — End-to-end output latency over the tailnet  `acceptance` `red`
 
 - **Given** the controller on mac-mini with 6 busy sessions and the page open on laptop
@@ -665,6 +683,15 @@
 - **Then** the service is serving again and the sessions resumed
 - **Oracle:** HTTP on the controller URL answers within 10 s of the kill AND both slots show resumed sessions
 - **Test:** _not scaffolded_
+
+#### SC-012-g — Upgrade keeps the recorded claude path without claude on PATH  `unit` `green`
+
+- **Given** a config with a `claude_path` that still exists and a PATH search that cannot find `claude`
+- **When** `RecordClaudePath` runs during an upgrade
+- **Then** the install keeps the recorded path instead of failing
+- **Oracle:** `RecordClaudePath` returns nil and `claude_path` is unchanged; with no recorded path it still returns an error
+- **Test doubles:** temp HOME; fake PATH
+- **Test:** `internal/tdd/install_test.go::SC-012-g`
 
 ### REQ-013 — Non-functional budgets from §13 hold: controller-added latency p95 <= 20 ms with 6 busy sessions, controller RSS <= 150 MB, page first load <= 2 s over the tailnet, binary <= 30 MB per platform.
 

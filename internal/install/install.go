@@ -152,6 +152,18 @@ func sortedKeys(m map[string]string) []string {
 func RecordClaudePath(configPath string, lookPath func(string) (string, error)) error {
 	p, err := lookPath("claude")
 	if err != nil {
+		// An upgrade run from a non-login shell (SSH or the service manager)
+		// often has no claude on PATH, but the previous install recorded its
+		// absolute path for exactly that reason. Keep a recorded path that still
+		// exists instead of failing the upgrade after the binary was replaced.
+		var cfg struct {
+			ClaudePath string `toml:"claude_path"`
+		}
+		if _, decErr := toml.DecodeFile(configPath, &cfg); decErr == nil && cfg.ClaudePath != "" {
+			if _, statErr := os.Stat(cfg.ClaudePath); statErr == nil {
+				return nil
+			}
+		}
 		return fmt.Errorf("claude not found on PATH: install Claude Code first: %w", err)
 	}
 	if !filepath.IsAbs(p) {
